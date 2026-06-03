@@ -39,7 +39,8 @@ const SEQ_MAP = {
   30: 'Alto - 1st',
   40: 'Alto - 2nd',
   50: 'Tenor',
-  60: 'Bass'
+  60: 'Bass',
+  90: 'HOLD'
 };
 
 // ---- Router ----
@@ -48,7 +49,7 @@ function doGet(e) {
     const action = e.parameter.action;
     if (action === 'getConfig')   return getConfig();
     if (action === 'getSingers')  return getSingers();
-    if (action === 'getSinger')   return getSinger(e.parameter.seq, e.parameter.lastname);
+    if (action === 'getSinger')   return getSinger(e.parameter.id);
     return respond({ error: 'Unknown action: ' + action });
   } catch (err) {
     return respond({ error: err.message });
@@ -89,8 +90,10 @@ function getConfig() {
       'Soprano - 1st', 'Soprano - 2nd',
       'Alto - 1st',    'Alto - 2nd',
       'Tenor - 1st',   'Tenor - 2nd',
-      'Bass - 1st',    'Bass - 2nd'
+      'Bass - 1st',    'Bass - 2nd',
+      'HOLD'
     ],
+    sections: ['Soprano', 'Alto', 'Tenor', 'Bass', 'HOLD'],
     seqMap: SEQ_MAP,
     attendanceCodes: [
       { code: 'X', label: 'Present',      color: 'green'  },
@@ -119,20 +122,17 @@ function getSingers() {
 }
 
 // ---- GET: Single Singer ----
-function getSinger(seq, lastname) {
+function getSinger(id) {
   const sheet   = getSheet();
   const data    = sheet.getDataRange().getValues();
   const headers = data[0];
 
   for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const seqMatch      = seq      && String(row[COL.SEQ])      === String(seq);
-    const lastnameMatch = lastname && String(row[COL.LASTNAME]).toLowerCase() === lastname.toLowerCase();
-    if (seqMatch && lastnameMatch) {
-      return respond({ singer: rowToSinger(row, headers) });
+    if (String(data[i][COL.ID]) === String(id)) {
+      return respond({ singer: rowToSinger(data[i], headers) });
     }
   }
-  return respond({ error: 'Singer not found' });
+  return respond({ error: 'Singer not found: ' + id });
 }
 
 // ---- POST: Update Singer ----
@@ -140,14 +140,13 @@ function updateSinger(body) {
   const sheet = getSheet();
   const data  = sheet.getDataRange().getValues();
   const s     = body.singer;
-  const seq   = String(body.seq);
-  const ln    = String(body.lastname).toLowerCase();
+  const id    = String(body.id);
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (String(row[COL.SEQ]) === seq &&
-        String(row[COL.LASTNAME]).toLowerCase() === ln) {
+    if (String(row[COL.ID]) === id) {
       const r = i + 1;
+      sheet.getRange(r, COL.SEQ       + 1).setValue(s.seq       || '');
       sheet.getRange(r, COL.SECTION   + 1).setValue(s.section   || '');
       sheet.getRange(r, COL.POSITION  + 1).setValue(s.position  || '');
       sheet.getRange(r, COL.LASTNAME  + 1).setValue(s.lastname  || '');
@@ -179,9 +178,19 @@ function updateSinger(body) {
 // ---- POST: Add Singer ----
 function addSinger(body) {
   const sheet = getSheet();
+  const data  = sheet.getDataRange().getValues();
   const s     = body.singer;
 
+  // Find next ID
+  let maxId = 0;
+  for (let i = 1; i < data.length; i++) {
+    const n = parseInt(data[i][COL.ID]);
+    if (!isNaN(n) && n > maxId) maxId = n;
+  }
+  const newId = maxId + 1;
+
   const newRow = new Array(COL.FIRST_DATE + 2).fill('');
+  newRow[COL.ID]        = newId;
   newRow[COL.SEQ]       = body.seq      || '';
   newRow[COL.SECTION]   = s.section     || '';
   newRow[COL.POSITION]  = s.position    || '';
@@ -205,27 +214,24 @@ function addSinger(body) {
   newRow[COL.NOTES]     = s.notes       || '';
 
   sheet.appendRow(newRow);
-  return respond({ success: true });
+  return respond({ success: true, id: newId });
 }
 
 // ---- POST: Update Attendance ----
 function updateAttendance(body) {
   const sheet  = getSheet();
   const data   = sheet.getDataRange().getValues();
-  const seq    = String(body.seq);
-  const ln     = String(body.lastname).toLowerCase();
+  const id     = String(body.id);
   const colIdx = parseInt(body.col);
   const value  = body.value; // 'X', 'O', or ''
 
   for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (String(row[COL.SEQ]) === seq &&
-        String(row[COL.LASTNAME]).toLowerCase() === ln) {
+    if (String(data[i][COL.ID]) === id) {
       sheet.getRange(i + 1, colIdx + 1).setValue(value);
       return respond({ success: true });
     }
   }
-  return respond({ error: 'Singer not found' });
+  return respond({ error: 'Singer not found: ' + id });
 }
 
 // ---- Helpers ----
@@ -235,6 +241,7 @@ function getSheet() {
 
 function rowToSinger(row, headers) {
   const singer = {
+    id:        String(row[COL.ID]  || ''),
     seq:       String(row[COL.SEQ] || ''),
     section:   String(row[COL.SECTION]   || ''),
     position:  String(row[COL.POSITION]  || ''),
