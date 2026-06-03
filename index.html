@@ -27,6 +27,9 @@
           </div>
         </div>
         <div class="header-actions">
+          <button id="btn-share" class="icon-btn" title="Share / Text Groups" aria-label="Share">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </button>
           <button id="btn-attendance" class="icon-btn" title="Take Attendance" aria-label="Attendance">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           </button>
@@ -54,6 +57,7 @@
             <option value="Alto">Alto</option>
             <option value="Tenor">Tenor</option>
             <option value="Bass">Bass</option>
+            <option value="HOLD">HOLD</option>
           </select>
         </div>
         <div class="select-wrapper">
@@ -145,6 +149,19 @@
         <button class="pin-key" data-key="0">0</button>
         <button class="pin-key pin-delete" data-key="delete">⌫</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Share Bottom Sheet -->
+  <div id="share-sheet" class="bottom-sheet hidden">
+    <div class="bottom-sheet-backdrop"></div>
+    <div class="bottom-sheet-panel">
+      <div class="bottom-sheet-handle"></div>
+      <div class="bottom-sheet-header">
+        <h2>Share</h2>
+        <button id="btn-close-share" class="close-btn">×</button>
+      </div>
+      <div id="share-content" class="share-content"></div>
     </div>
   </div>
 
