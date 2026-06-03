@@ -495,7 +495,28 @@ function getSeqForPosition(position) {
 }
 
 // ---- Attendance Screen ----
-function openAttendance() {
+async function openAttendance() {
+  // If dates are missing from cache, fetch fresh config first
+  if (!appConfig.dates || appConfig.dates.length === 0) {
+    try {
+      const res    = await fetch(`${API_URL}?action=getConfig`);
+      const config = await res.json();
+      if (!config.error) {
+        appConfig = config;
+        // Update stored data
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const data = JSON.parse(stored);
+          data.config = config;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+      }
+    } catch(e) {
+      alert('Could not load dates. Check connection.');
+      return;
+    }
+  }
+
   const dates = appConfig.dates || [];
   if (dates.length === 0) {
     alert('No dates found. Please refresh data.');
