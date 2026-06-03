@@ -162,6 +162,10 @@ function renderList() {
   const position = positionFilter.value;
 
   let filtered = allSingers.filter(s => {
+    // Exclude HOLD singers unless explicitly filtering for HOLD
+    if (s.seq === '90' || s.section === 'HOLD' || s.position === 'HOLD') {
+      if (section !== 'HOLD') return false;
+    }
     if (section !== 'all' && s.section !== section) return false;
     if (position !== 'all' && s.position !== position) return false;
     if (search) {
@@ -180,10 +184,17 @@ function renderList() {
     return;
   }
 
-  // Group by section
+  // Group by SEQ — same SEQ singers go together (e.g. all Bass together)
   const groups = {};
   filtered.forEach(s => {
-    const key = s.position || s.section || 'Other';
+    const seq = parseInt(s.seq) || 0;
+    // Use SEQ label as group key for Tenor(50), Bass(60), HOLD(90)
+    // Use position for Soprano/Alto which have distinct 1st/2nd groups
+    let key;
+    if (seq === 50) key = 'Tenor';
+    else if (seq === 60) key = 'Bass';
+    else if (seq === 90) key = 'HOLD';
+    else key = s.position || s.section || 'Other';
     if (!groups[key]) groups[key] = [];
     groups[key].push(s);
   });
@@ -191,8 +202,7 @@ function renderList() {
   const sectionOrder = [
     'Soprano - 1st', 'Soprano - 2nd',
     'Alto - 1st', 'Alto - 2nd',
-    'Tenor - 1st', 'Tenor - 2nd',
-    'Bass - 1st', 'Bass - 2nd'
+    'Tenor', 'Bass', 'HOLD'
   ];
 
   const sortedKeys = Object.keys(groups).sort((a, b) => {
@@ -216,7 +226,7 @@ function renderList() {
       if (s.new2026 === 'Y') badges.push('<span class="badge badge-new">New</span>');
       if (s.verified === 'Y') badges.push('<span class="badge badge-verify">✓</span>');
       if (s.iphone === 'Y') badges.push('<span class="badge badge-iphone">📱</span>');
-      html += `<div class="singer-card" data-seq="${escHtml(s.seq)}" data-lastname="${escHtml(s.lastname)}">
+      html += `<div class="singer-card" data-id="${escHtml(s.id)}">
         <div class="singer-avatar ${sectionClass}">${initials}</div>
         <div class="singer-info">
           <div class="singer-name">${escHtml(s.lastname)}, ${escHtml(s.firstname)}</div>
@@ -232,9 +242,8 @@ function renderList() {
 
   document.querySelectorAll('.singer-card').forEach(card => {
     card.addEventListener('click', () => {
-      const seq = card.dataset.seq;
-      const ln  = card.dataset.lastname;
-      const singer = allSingers.find(s => String(s.seq) === seq && s.lastname === ln);
+      const id = card.dataset.id;
+      const singer = allSingers.find(s => String(s.id) === id);
       if (singer) openProfile(singer);
     });
   });
@@ -244,7 +253,9 @@ function updatePositionFilter() {
   const section = sectionFilter.value;
   const positions = appConfig.positions || [];
   const relevant = section === 'all'
-    ? positions
+    ? positions.filter(p => p !== 'HOLD')
+    : section === 'HOLD'
+    ? ['HOLD']
     : positions.filter(p => p.toLowerCase().startsWith(section.toLowerCase()));
 
   positionFilter.innerHTML = '<option value="all">All Positions</option>';
@@ -445,9 +456,10 @@ async function saveSinger() {
   };
 
   const isNew = !currentSinger;
+  singerData.seq = isNew ? String(getSeqForPosition(singerData.position)) : currentSinger.seq;
   const body = isNew
-    ? { action: 'addSinger', pin, seq: getSeqForPosition(singerData.position), singer: singerData }
-    : { action: 'updateSinger', pin, seq: currentSinger.seq, lastname: currentSinger.lastname, singer: singerData };
+    ? { action: 'addSinger', pin, seq: singerData.seq, singer: singerData }
+    : { action: 'updateSinger', pin, id: currentSinger.id, singer: singerData };
 
   document.getElementById('btn-save').textContent = 'Saving…';
   document.getElementById('btn-save').disabled = true;
@@ -459,12 +471,12 @@ async function saveSinger() {
 
     // Update local data
     if (isNew) {
-      singerData.seq = String(getSeqForPosition(singerData.position));
+      singerData.id = String(data.id || Date.now());
       singerData.attendance = {};
       singerData.combined = singerData.lastname + ', ' + singerData.firstname;
       allSingers.push(singerData);
     } else {
-      const idx = allSingers.findIndex(s => s.seq === currentSinger.seq && s.lastname === currentSinger.lastname);
+      const idx = allSingers.findIndex(s => s.id === currentSinger.id);
       if (idx >= 0) {
         allSingers[idx] = { ...allSingers[idx], ...singerData };
         currentSinger = allSingers[idx];
@@ -560,7 +572,7 @@ function renderAttendanceRows() {
 
   sections.forEach(section => {
     const singers = allSingers
-      .filter(s => s.section === section)
+      .filter(s => s.section === section && s.seq !== '90' && s.position !== 'HOLD')
       .sort((a, b) => a.lastname.localeCompare(b.lastname));
     if (singers.length === 0) return;
 
@@ -571,11 +583,11 @@ function renderAttendanceRows() {
         <span class="att-singer-name">${escHtml(s.lastname)}, ${escHtml(s.firstname)}</span>
         <div class="att-buttons">
           <button class="att-btn ${current === 'X' ? 'active-X' : ''}" 
-            data-seq="${escHtml(s.seq)}" data-ln="${escHtml(s.lastname)}" data-val="X">X</button>
+            data-id="${escHtml(s.id)}" data-val="X">X</button>
           <button class="att-btn ${current === 'O' ? 'active-O' : ''}" 
-            data-seq="${escHtml(s.seq)}" data-ln="${escHtml(s.lastname)}" data-val="O">O</button>
+            data-id="${escHtml(s.id)}" data-val="O">O</button>
           <button class="att-btn ${current === '' ? 'active-blank' : ''}" 
-            data-seq="${escHtml(s.seq)}" data-ln="${escHtml(s.lastname)}" data-val="">–</button>
+            data-id="${escHtml(s.id)}" data-val="">–</button>
         </div>
       </div>`;
     });
@@ -585,16 +597,17 @@ function renderAttendanceRows() {
   document.getElementById('att-singer-rows').innerHTML = html;
 
   document.querySelectorAll('.att-btn').forEach(btn => {
-    btn.addEventListener('click', () => markAttendance(btn.dataset.seq, btn.dataset.ln, btn.dataset.val, btn));
+    btn.addEventListener('click', () => markAttendance(btn.dataset.id, btn.dataset.val));
   });
 }
 
-async function markAttendance(seq, lastname, value, btn) {
+async function markAttendance(id, value) {
   const pin = sessionStorage.getItem(SESSION_PIN);
-  if (!pin) { requirePin(() => markAttendance(seq, lastname, value, btn)); return; }
+  if (!pin) { requirePin(() => markAttendance(id, value)); return; }
 
   // Optimistic update
-  const singer = allSingers.find(s => String(s.seq) === seq && s.lastname === lastname);
+  const singer = allSingers.find(s => String(s.id) === id);
+  const prev = singer ? (singer.attendance[attDateCol] || '') : '';
   if (singer) {
     singer.attendance[attDateCol] = value;
     saveLocalData();
@@ -606,7 +619,7 @@ async function markAttendance(seq, lastname, value, btn) {
       method: 'POST',
       body: JSON.stringify({
         action: 'updateAttendance',
-        pin, seq, lastname,
+        pin, id,
         col: attDateCol,
         value
       })
@@ -615,8 +628,7 @@ async function markAttendance(seq, lastname, value, btn) {
     if (data.error) throw new Error(data.error);
   } catch(err) {
     alert('Failed to save attendance: ' + err.message);
-    // Revert
-    if (singer) singer.attendance[attDateCol] = value === 'X' ? '' : 'X';
+    if (singer) singer.attendance[attDateCol] = prev;
     renderAttendanceRows();
   }
 }
@@ -727,4 +739,174 @@ function saveLocalData() {
 function showLastUpdated() {
   const ts = localStorage.getItem(STORAGE_UPDATED);
   lastUpdated.textContent = ts ? `Updated ${ts}` : '';
+}
+
+// ============================================
+// SHARE / TEXT GROUPS / EMAIL
+// ============================================
+
+const shareSheet   = document.getElementById('share-sheet');
+const shareContent = document.getElementById('share-content');
+
+document.getElementById('btn-share').addEventListener('click', openShareSheet);
+document.getElementById('btn-close-share').addEventListener('click', closeShareSheet);
+document.querySelector('.bottom-sheet-backdrop').addEventListener('click', closeShareSheet);
+
+function openShareSheet() {
+  buildShareContent();
+  shareSheet.classList.remove('hidden');
+}
+
+function closeShareSheet() {
+  shareSheet.classList.add('hidden');
+}
+
+function isValidEmail(email) {
+  if (!email) return false;
+  // Basic but robust email validation
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+}
+
+function buildShareContent() {
+  // Get currently filtered singers (same logic as renderList, excluding HOLD)
+  const search   = searchInput.value.toLowerCase().trim();
+  const section  = sectionFilter.value;
+  const position = positionFilter.value;
+
+  let filtered = allSingers.filter(s => {
+    if (s.seq === '90' || s.section === 'HOLD' || s.position === 'HOLD') return false;
+    if (section !== 'all' && s.section !== section) return false;
+    if (position !== 'all' && s.position !== position) return false;
+    if (search) {
+      const haystack = [s.firstname, s.lastname, s.email,
+                        s.cellPhone, s.position, s.section].join(' ').toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  // Sort same as list: by SEQ then lastname
+  const seqOrder = [10, 20, 30, 40, 50, 60];
+  filtered.sort((a, b) => {
+    const sa = parseInt(a.seq) || 99;
+    const sb = parseInt(b.seq) || 99;
+    if (sa !== sb) return seqOrder.indexOf(sa) - seqOrder.indexOf(sb);
+    return a.lastname.localeCompare(b.lastname);
+  });
+
+  // ---- TEXT GROUPS ----
+  // Only singers with cell phone, grouped in 10s, labeled by section
+  const withPhone = filtered.filter(s => s.cellPhone && s.cellPhone.trim());
+
+  // Build sequential groups of 10, track section transitions for labels
+  const textGroups = [];
+  let groupIndex = 0;
+  let currentGroup = null;
+  let currentSeq = null;
+  let currentLabel = '';
+
+  withPhone.forEach((s, i) => {
+    const seq = parseInt(s.seq) || 0;
+    const label = getSeqLabel(seq);
+
+    // Start new group if: first singer, section changed, or group is full (10)
+    if (!currentGroup || seq !== currentSeq || currentGroup.numbers.length >= 10) {
+      if (currentGroup) textGroups.push(currentGroup);
+      groupIndex++;
+      currentSeq = seq;
+      currentLabel = label;
+      currentGroup = {
+        index: groupIndex,
+        label: label,
+        numbers: []
+      };
+      // If section changed mid-flow, update label
+    }
+
+    currentGroup.numbers.push(s.cellPhone.trim());
+  });
+  if (currentGroup && currentGroup.numbers.length > 0) textGroups.push(currentGroup);
+
+  // ---- EMAIL LIST ----
+  const validEmails = filtered
+    .filter(s => isValidEmail(s.email))
+    .map(s => s.email.trim());
+
+  // Build HTML
+  let html = `<div class="share-summary">
+    Showing <strong>${filtered.length}</strong> singers · 
+    <strong>${withPhone.length}</strong> with phone · 
+    <strong>${validEmails.length}</strong> with valid email
+  </div>`;
+
+  // Text Groups
+  html += `<div class="share-section-title">📱 Text Groups</div>`;
+
+  if (textGroups.length === 0) {
+    html += `<p style="font-size:13px;color:var(--text-light)">No singers with phone numbers in current selection.</p>`;
+  } else {
+    textGroups.forEach(group => {
+      const nums = group.numbers.join(', ');
+      html += `<div class="share-group">
+        <div class="share-group-header">
+          <span class="share-group-label">Group ${group.index} — ${escHtml(group.label)}</span>
+          <span class="share-group-count">${group.numbers.length} numbers</span>
+        </div>
+        <div class="share-numbers">${escHtml(nums)}</div>
+        <button class="share-btn" onclick="copyText('${escAttr(nums)}', this)">Copy Numbers</button>
+      </div>`;
+    });
+  }
+
+  // Email
+  html += `<div class="share-section-title">✉️ Email List</div>`;
+
+  if (validEmails.length === 0) {
+    html += `<p style="font-size:13px;color:var(--text-light)">No valid email addresses in current selection.</p>`;
+  } else {
+    const emailStr = validEmails.join(', ');
+    const mailtoLink = `mailto:?bcc=${encodeURIComponent(validEmails.join(','))}`;
+    html += `<div class="share-group">
+      <div class="share-group-header">
+        <span class="share-group-label">All Emails</span>
+        <span class="share-group-count">${validEmails.length} addresses</span>
+      </div>
+      <div class="share-email-list">${escHtml(emailStr)}</div>
+      <button class="share-btn gold" onclick="window.location.href='${escAttr(mailtoLink)}'">Open in Mail App</button>
+      <button class="share-btn" onclick="copyText('${escAttr(emailStr)}', this)">Copy List</button>
+    </div>`;
+  }
+
+  shareContent.innerHTML = html;
+}
+
+function getSeqLabel(seq) {
+  const map = { 10: 'Soprano 1st', 20: 'Soprano 2nd', 30: 'Alto 1st',
+                40: 'Alto 2nd', 50: 'Tenor', 60: 'Bass', 90: 'Hold' };
+  return map[seq] || 'Other';
+}
+
+function copyText(text, btn) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => btn.textContent = orig, 2000);
+    });
+  } else {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  }
+}
+
+function escAttr(str) {
+  return String(str).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 }
