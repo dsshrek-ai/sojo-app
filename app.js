@@ -192,7 +192,7 @@ function renderList() {
     'Soprano - 1st', 'Soprano - 2nd',
     'Alto - 1st', 'Alto - 2nd',
     'Tenor - 1st', 'Tenor - 2nd',
-    'Baritone', 'Bass - 1st', 'Bass - 2nd', 'Bass'
+    'Bass - 1st', 'Bass - 2nd'
   ];
 
   const sortedKeys = Object.keys(groups).sort((a, b) => {
@@ -277,9 +277,9 @@ function openProfile(singer) {
 
   // Contact
   html += `<div class="info-section"><div class="info-section-title">Contact</div>`;
-  html += infoRow('Cell', singer.cellPhone ? `<a href="tel:${singer.cellPhone}">${escHtml(singer.cellPhone)}</a>` : '');
-  html += infoRow('Home', singer.homePhone ? `<a href="tel:${singer.homePhone}">${escHtml(singer.homePhone)}</a>` : '');
-  html += infoRow('Email', singer.email ? `<a href="mailto:${singer.email}">${escHtml(singer.email)}</a>` : '');
+  html += infoRow('Cell', singer.cellPhone ? phoneLink(singer.cellPhone) : '');
+  html += infoRow('Home', singer.homePhone ? phoneLink(singer.homePhone) : '');
+  html += infoRow('Email', singer.email ? `<a href="mailto:${escHtml(singer.email)}" style="color:var(--navy-light)">${escHtml(singer.email)}</a>` : '');
   if (singer.address1) {
     const addr = [singer.address1, singer.city, singer.state, singer.zip].filter(Boolean).join(', ');
     html += infoRow('Address', escHtml(addr));
@@ -491,7 +491,7 @@ function getSeqForPosition(position) {
   if (position.startsWith('Alto - 1'))    return 30;
   if (position.startsWith('Alto - 2'))    return 40;
   if (position.startsWith('Tenor'))       return 50;
-  return 60; // Bass / Baritone
+  return 60; // Bass - 1st / Bass - 2nd
 }
 
 // ---- Attendance Screen ----
@@ -690,6 +690,14 @@ function slideOut(screen) {
 }
 
 // ---- Helpers ----
+function phoneLink(phone) {
+  const clean = escHtml(phone);
+  return `<a href="tel:${clean}" style="color:var(--navy-light);text-decoration:none;display:inline-flex;align-items:center;gap:6px">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.08 6.08l1.28-1.28a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    ${clean}
+  </a>`;
+}
+
 function getInitials(singer) {
   const f = (singer.firstname || '').trim()[0] || '';
   const l = (singer.lastname  || '').trim()[0] || '';
