@@ -310,7 +310,7 @@ function openProfile(singer) {
     html += `<div class="info-section"><div class="info-section-title">Attendance — ${present}/${total} present</div>
       <div class="att-legend">
         <div class="att-legend-item"><div class="legend-dot legend-X"></div> Present</div>
-        <div class="att-legend-item"><div class="legend-dot legend-O"></div> Notified Out</div>
+        <div class="att-legend-item"><div class="legend-dot legend-O"></div> Absent</div>
         <div class="att-legend-item"><div class="legend-dot legend-blank"></div> Unknown</div>
       </div>
       <div class="attendance-grid">`;
