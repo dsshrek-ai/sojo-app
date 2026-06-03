@@ -668,15 +668,14 @@ function buildShareContent() {
   if (textGroups.length === 0) {
     html += `<p style="font-size:13px;color:var(--text-light)">No singers with phone numbers in current selection.</p>`;
   } else {
-    textGroups.forEach(group => {
-      const nums = group.numbers.join(', ');
+    textGroups.forEach((group, gi) => {
       html += `<div class="share-group">
         <div class="share-group-header">
           <span class="share-group-label">Group ${group.index} — ${escHtml(group.label)}</span>
           <span class="share-group-count">${group.numbers.length} numbers</span>
         </div>
-        <div class="share-numbers">${escHtml(nums)}</div>
-        <button class="share-btn" onclick="copyText(${JSON.stringify(nums)}, this)">Copy Numbers</button>
+        <div class="share-numbers" id="nums-${gi}">${escHtml(group.numbers.join(', '))}</div>
+        <button class="share-btn" data-copy-id="nums-${gi}">Copy Numbers</button>
       </div>`;
     });
   }
@@ -693,13 +692,29 @@ function buildShareContent() {
         <span class="share-group-label">All Emails</span>
         <span class="share-group-count">${validEmails.length} addresses</span>
       </div>
-      <div class="share-email-list">${escHtml(emailStr)}</div>
-      <button class="share-btn gold" onclick="window.open(${JSON.stringify(mailtoLink)})">Open in Mail App</button>
-      <button class="share-btn" onclick="copyText(${JSON.stringify(emailStr)}, this)">Copy List</button>
+      <div class="share-email-list" id="email-list">${escHtml(emailStr)}</div>
+      <button class="share-btn gold" id="btn-open-mail" data-mailto="${encodeURIComponent(mailtoLink)}">Open in Mail App</button>
+      <button class="share-btn" data-copy-id="email-list">Copy List</button>
     </div>`;
   }
 
   shareContent.innerHTML = html;
+
+  // Wire up copy buttons
+  shareContent.querySelectorAll('[data-copy-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el = document.getElementById(btn.dataset.copyId);
+      if (el) copyText(el.textContent, btn);
+    });
+  });
+
+  // Wire up mail button
+  const mailBtn = document.getElementById('btn-open-mail');
+  if (mailBtn) {
+    mailBtn.addEventListener('click', () => {
+      window.location.href = decodeURIComponent(mailBtn.dataset.mailto);
+    });
+  }
 }
 
 function getSeqLabel(seq) {
