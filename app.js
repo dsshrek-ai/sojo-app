@@ -712,7 +712,14 @@ function buildShareContent() {
   const mailBtn = document.getElementById('btn-open-mail');
   if (mailBtn) {
     mailBtn.addEventListener('click', () => {
-      window.location.href = decodeURIComponent(mailBtn.dataset.mailto);
+      const mailto = decodeURIComponent(mailBtn.dataset.mailto);
+      // Use a temporary anchor for maximum iOS compatibility
+      const a = document.createElement('a');
+      a.href = mailto;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => document.body.removeChild(a), 100);
     });
   }
 }
@@ -723,23 +730,45 @@ function getSeqLabel(seq) {
 }
 
 function copyText(text, btn) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => {
-      const orig = btn.textContent;
-      btn.textContent = '✓ Copied!';
-      setTimeout(() => btn.textContent = orig, 2000);
-    });
-  } else {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    const orig = btn.textContent;
+  const orig = btn.textContent;
+  const success = () => {
     btn.textContent = '✓ Copied!';
     setTimeout(() => btn.textContent = orig, 2000);
+  };
+
+  // Modern clipboard API
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(success).catch(() => fallbackCopy(text, success));
+    return;
   }
+  fallbackCopy(text, success);
+}
+
+function fallbackCopy(text, success) {
+  // iOS-compatible fallback
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  ta.style.top = '-9999px';
+  ta.setAttribute('readonly', '');
+  document.body.appendChild(ta);
+
+  // iOS requires this specific approach
+  const range = document.createRange();
+  range.selectNodeContents(ta);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  ta.setSelectionRange(0, 999999);
+
+  try {
+    document.execCommand('copy');
+    success();
+  } catch(e) {
+    alert('Copy failed. Please select and copy the text manually.');
+  }
+  document.body.removeChild(ta);
 }
 
 // ---- PIN ----
