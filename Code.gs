@@ -89,7 +89,7 @@ function getConfig() {
       'Soprano - 1st', 'Soprano - 2nd',
       'Alto - 1st',    'Alto - 2nd',
       'Tenor - 1st',   'Tenor - 2nd',
-      'Baritone',      'Bass'
+      'Bass - 1st',    'Bass - 2nd'
     ],
     seqMap: SEQ_MAP,
     attendanceCodes: [
