@@ -42,6 +42,8 @@ window.addEventListener('load', init);
 async function init() {
   registerSW();
   setupEvents();
+  // Hide loading overlay so PIN modal is visible
+  loadingOverlay.classList.add('hidden');
   // Require PIN to access app
   if (!sessionStorage.getItem(SESSION_PIN)) {
     requirePin(() => loadApp());
