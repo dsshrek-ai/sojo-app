@@ -41,6 +41,16 @@ window.addEventListener('load', init);
 
 async function init() {
   registerSW();
+  setupEvents();
+  // Require PIN to access app
+  if (!sessionStorage.getItem(SESSION_PIN)) {
+    requirePin(() => loadApp());
+  } else {
+    await loadApp();
+  }
+}
+
+async function loadApp() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
     try {
@@ -56,7 +66,6 @@ async function init() {
   } else {
     await fetchFromWeb();
   }
-  setupEvents();
 }
 
 // ---- Service Worker ----
@@ -118,11 +127,11 @@ async function fetchFromWeb() {
 // ---- Events ----
 function setupEvents() {
   document.getElementById('btn-refresh').addEventListener('click', fetchFromWeb);
-  document.getElementById('btn-add').addEventListener('click', () => requirePin(() => openAddSinger()));
-  document.getElementById('btn-attendance').addEventListener('click', () => requirePin(() => openAttendance()));
+  document.getElementById('btn-add').addEventListener('click', () => openAddSinger());
+  document.getElementById('btn-attendance').addEventListener('click', () => openAttendance());
   document.getElementById('btn-share').addEventListener('click', openShareSheet);
   document.getElementById('btn-back-profile').addEventListener('click', goHome);
-  document.getElementById('btn-edit').addEventListener('click', () => requirePin(() => openEditSinger(currentSinger)));
+  document.getElementById('btn-edit').addEventListener('click', () => openEditSinger(currentSinger));
   document.getElementById('btn-back-edit').addEventListener('click', () => {
     slideOut(screenEdit);
     if (currentSinger) { slideIn(screenProfile); }
@@ -424,7 +433,6 @@ function openAddSinger() {
 
 async function saveSinger() {
   const pin = sessionStorage.getItem(SESSION_PIN);
-  if (!pin) { requirePin(() => saveSinger()); return; }
 
   const singerData = {
     firstname: document.getElementById('f-firstname').value.trim(),
@@ -587,7 +595,6 @@ function renderAttendanceRows() {
 
 async function markAttendance(id, value) {
   const pin = sessionStorage.getItem(SESSION_PIN);
-  if (!pin) { requirePin(() => markAttendance(id, value)); return; }
 
   const singer = allSingers.find(s => String(s.id) === id);
   const prev   = singer ? (singer.attendance[attDateCol] || '') : '';
@@ -793,7 +800,7 @@ function handlePinKey(key) {
 }
 
 function verifyPin() {
-  if (pinBuffer === '1234') {
+  if (pinBuffer === '0127') {
     sessionStorage.setItem(SESSION_PIN, pinBuffer);
     closePinModal();
     if (pendingAction) { pendingAction(); pendingAction = null; }
