@@ -565,16 +565,40 @@ async function openAttendance() {
 }
 
 function renderAttendanceRows() {
-  const sections = ['Soprano','Alto','Tenor','Bass'];
+  const filteredSingers = getFilteredSingers()
+    .filter(s => String(s.seq) !== '90' && s.position !== 'HOLD' && s.section !== 'HOLD');
+  const groupOrder = ['Soprano - 1st','Soprano - 2nd','Alto - 1st','Alto - 2nd','Tenor','Bass'];
+  const groups = {};
   let html = '';
 
-  sections.forEach(section => {
-    const singers = allSingers
-      .filter(s => s.section === section && String(s.seq) !== '90' && s.position !== 'HOLD')
-      .sort((a, b) => a.lastname.localeCompare(b.lastname));
+  filteredSingers.forEach(s => {
+    const seq = parseInt(s.seq) || 0;
+    let key;
+    if      (seq === 10) key = 'Soprano - 1st';
+    else if (seq === 20) key = 'Soprano - 2nd';
+    else if (seq === 30) key = 'Alto - 1st';
+    else if (seq === 40) key = 'Alto - 2nd';
+    else if (seq === 50) key = 'Tenor';
+    else if (seq === 60) key = 'Bass';
+    else                 key = s.position || s.section || 'Other';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(s);
+  });
+
+  const sortedKeys = Object.keys(groups).sort((a, b) => {
+    const ai = groupOrder.indexOf(a);
+    const bi = groupOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  sortedKeys.forEach(key => {
+    const singers = groups[key].sort((a, b) => a.lastname.localeCompare(b.lastname));
     if (singers.length === 0) return;
 
-    html += `<div class="att-section-group"><div class="att-section-header">${escHtml(section)}</div>`;
+    html += `<div class="att-section-group"><div class="att-section-header">${escHtml(key)}</div>`;
     singers.forEach(s => {
       const current = (s.attendance[attDateCol] || '').trim();
       html += `<div class="att-singer-row">
@@ -588,6 +612,10 @@ function renderAttendanceRows() {
     });
     html += '</div>';
   });
+
+  if (!html) {
+    html = `<div class="empty-state"><p>No singers found for the current filters.</p></div>`;
+  }
 
   document.getElementById('att-singer-rows').innerHTML = html;
   document.querySelectorAll('.att-btn').forEach(btn => {
