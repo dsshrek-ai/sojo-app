@@ -290,6 +290,7 @@ function renderList() {
         badges.push(`<span class="badge badge-missing" data-id="${escHtml(s.id)}">⚠ Info</span>`);
       }
 
+      const hasNote = !!(s.notes || '').trim();
       html += `<div class="singer-card" data-id="${escHtml(s.id)}">
         <div class="singer-avatar ${sectionClass}">${initials}</div>
         <div class="singer-info">
@@ -297,6 +298,9 @@ function renderList() {
           <div class="singer-sub">${escHtml(s.position || s.section)}${s.folder ? ' · Folder ' + escHtml(s.folder) : ''}</div>
         </div>
         <div class="singer-badges">${badges.join('')}</div>
+        <button class="note-btn${hasNote ? ' has-note' : ''}" data-id="${escHtml(s.id)}" title="Note" aria-label="Note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </button>
       </div>`;
     });
     html += '</div>';
@@ -306,10 +310,18 @@ function renderList() {
 
   document.querySelectorAll('.singer-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      // Don't open profile if the missing-info badge was tapped
       if (e.target.closest('.badge-missing')) return;
+      if (e.target.closest('.note-btn')) return;
       const singer = allSingers.find(s => String(s.id) === card.dataset.id);
       if (singer) openProfile(singer);
+    });
+  });
+
+  document.querySelectorAll('.note-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const singer = allSingers.find(s => String(s.id) === btn.dataset.id);
+      if (singer) openNoteModal(singer);
     });
   });
 
@@ -370,6 +382,61 @@ function showMissingInfoModal(singer) {
 
   modal.addEventListener('click', () => modal.remove());
   document.body.appendChild(modal);
+}
+
+// ---- Note Modal ----
+function openNoteModal(singer) {
+  const existing = document.getElementById('note-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'note-modal';
+  modal.className = 'note-modal';
+  modal.innerHTML = `
+    <div class="note-modal-box">
+      <div class="note-modal-header">
+        <div class="note-modal-title">${escHtml(singer.firstname)} ${escHtml(singer.lastname)}</div>
+        <button class="note-modal-close" aria-label="Close">×</button>
+      </div>
+      <textarea class="note-modal-textarea" id="note-modal-text" placeholder="No note yet…">${escHtml(singer.notes || '')}</textarea>
+      <div class="note-modal-footer">
+        <button class="note-modal-save" id="note-modal-save">Save</button>
+      </div>
+    </div>`;
+
+  modal.querySelector('.note-modal-close').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+  modal.querySelector('#note-modal-save').addEventListener('click', () => saveNote(singer, modal));
+
+  document.body.appendChild(modal);
+  setTimeout(() => modal.querySelector('#note-modal-text').focus(), 50);
+}
+
+async function saveNote(singer, modal) {
+  const pin  = sessionStorage.getItem(SESSION_PIN);
+  const text = document.getElementById('note-modal-text').value.trim();
+  const saveBtn = document.getElementById('note-modal-save');
+  saveBtn.textContent = 'Saving…';
+  saveBtn.disabled = true;
+
+  try {
+    const singerData = { ...singer, notes: text };
+    const body = { action: 'updateSinger', pin, id: singer.id, singer: singerData };
+    const res  = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const idx = allSingers.findIndex(s => s.id === singer.id);
+    if (idx >= 0) allSingers[idx].notes = text;
+
+    modal.remove();
+    renderList();
+  } catch(err) {
+    alert('Save failed: ' + err.message);
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled = false;
+  }
 }
 
 // ---- Profile Screen ----
