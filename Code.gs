@@ -3,7 +3,7 @@
 // ============================================
 
 const SHEET_NAME = 'SOJO Data';
-const ADMIN_PIN  = '1234'; // Change before distributing
+const ADMIN_PIN  = '0127'; // Change before distributing
 
 // ---- Column definitions (0-based) ----
 // A=0:ID, B=1:SEQ, C=2:Section, D=3:Position, E=4:Lastname, F=5:Firstname
@@ -95,7 +95,7 @@ function getConfig() {
     seqMap:         SEQ_MAP,
     attendanceCodes: [
       { code: 'X', label: 'Present',      color: 'green'  },
-      { code: 'O', label: 'Notified Out', color: 'yellow' },
+      { code: 'O', label: 'Absent',       color: 'yellow' },
       { code: '',  label: 'Unknown',      color: 'gray'   }
     ],
     dates:          dates,
