@@ -270,11 +270,11 @@ html, body {
 .singer-card {
   background: var(--white);
   border-radius: var(--radius-md);
-  padding: 12px 14px;
+  padding: 12px 8px 12px 14px;
   margin-bottom: 6px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: transform 0.1s, box-shadow 0.1s;
@@ -1237,15 +1237,14 @@ html, body {
   flex-shrink: 0;
   background: none;
   border: none;
-  padding: 6px;
-  margin-left: 4px;
+  padding: 6px 4px;
   color: var(--text-light);
   cursor: pointer;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.45;
+  opacity: 0.6;
   transition: opacity 0.15s, color 0.15s;
 }
 .note-btn.has-note {
