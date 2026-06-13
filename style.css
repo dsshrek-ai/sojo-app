@@ -339,6 +339,77 @@ html, body {
 .badge-new    { background: #dbeafe; color: #1d4ed8; }
 .badge-verify { background: #dcfce7; color: #15803d; }
 .badge-iphone { background: #f3f4f6; color: #6b7280; }
+.badge-missing {
+  background: #fef3c7;
+  color: #92400e;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.badge-missing:active { background: #fde68a; }
+
+/* ============ MISSING INFO MODAL ============ */
+.missing-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.missing-modal-box {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 24px 20px 18px;
+  width: 260px;
+  max-width: 85vw;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+}
+
+.missing-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 4px;
+}
+
+.missing-modal-name {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 14px;
+}
+
+.missing-modal-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.missing-modal-list li {
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.missing-modal-hint {
+  font-size: 11px;
+  color: var(--text-light);
+}
 
 /* ============ LOADING ============ */
 .loading-overlay {
