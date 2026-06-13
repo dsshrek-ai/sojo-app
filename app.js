@@ -155,7 +155,6 @@ function setupEvents() {
   document.querySelector('.drawer-backdrop').addEventListener('click', closeMenu);
   document.getElementById('menu-share').addEventListener('click', () => { closeMenu(); openShareSheet(); });
   document.getElementById('menu-attendance').addEventListener('click', () => { closeMenu(); openAttendance(); });
-  document.getElementById('menu-add').addEventListener('click', () => { closeMenu(); openAddSinger(); });
   document.getElementById('menu-refresh').addEventListener('click', () => { closeMenu(); fetchFromWeb({ silent: false }); });
 
   // Offline banner dismiss
@@ -460,8 +459,7 @@ function phoneLink(phone) {
 
 // ---- Edit Singer ----
 function openEditSinger(singer) {
-  const isNew = !singer;
-  document.getElementById('edit-title').textContent = isNew ? 'Add Singer' : `Edit ${singer ? singer.lastname : ''}`;
+  document.getElementById('edit-title').textContent = `Edit ${singer ? singer.lastname : ''}`;
 
   const positions = appConfig.positions || ['Soprano - 1st','Soprano - 2nd','Alto - 1st','Alto - 2nd','Tenor - 1st','Tenor - 2nd','Bass - 1st','Bass - 2nd','HOLD'];
   const sections  = appConfig.sections  || ['Soprano','Alto','Tenor','Bass','HOLD'];
@@ -527,11 +525,6 @@ function checkRow(id, label, checked) {
   </div>`;
 }
 
-function openAddSinger() {
-  currentSinger = null;
-  openEditSinger(null);
-}
-
 async function saveSinger() {
   const pin = sessionStorage.getItem(SESSION_PIN);
 
@@ -557,13 +550,10 @@ async function saveSinger() {
     notes2:    document.getElementById('f-notes2').value.trim(),
   };
 
-  const isNew  = !currentSinger;
   const seqNum = getSeqForPosition(singerData.position);
   singerData.seq = String(seqNum);
 
-  const body = isNew
-    ? { action: 'addSinger', pin, seq: seqNum, singer: singerData }
-    : { action: 'updateSinger', pin, id: currentSinger.id, singer: singerData };
+  const body = { action: 'updateSinger', pin, id: currentSinger.id, singer: singerData };
 
   const saveBtn = document.getElementById('btn-save');
   saveBtn.textContent = 'Saving…';
@@ -574,23 +564,16 @@ async function saveSinger() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
-    if (isNew) {
-      singerData.id         = String(data.id || Date.now());
-      singerData.attendance = {};
-      singerData.combined   = singerData.lastname + ', ' + singerData.firstname;
-      allSingers.push(singerData);
-    } else {
-      const idx = allSingers.findIndex(s => s.id === currentSinger.id);
-      if (idx >= 0) {
-        allSingers[idx] = { ...allSingers[idx], ...singerData };
-        currentSinger   = allSingers[idx];
-      }
+    const idx = allSingers.findIndex(s => s.id === currentSinger.id);
+    if (idx >= 0) {
+      allSingers[idx] = { ...allSingers[idx], ...singerData };
+      currentSinger   = allSingers[idx];
     }
 
     saveLocalData();
     renderList();
     document.getElementById('btn-back-edit').click();
-    if (!isNew) openProfile(currentSinger);
+    openProfile(currentSinger);
 
   } catch(err) {
     alert('Save failed: ' + err.message);
