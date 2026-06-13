@@ -1,5 +1,5 @@
 /* ============================================
-   SOJO Singer Directory — App Logic
+   SOJO App — Google Apps Script API
    ============================================ */
 
 const API_URL         = 'https://script.google.com/macros/s/AKfycbyMzS0N4UhQx32FEN3_delMMaeCoajsuFJUpQDSfzEsTN_nH-WcnheTw88izVtRud-s/exec';
@@ -35,6 +35,7 @@ const pinModal         = document.getElementById('pin-modal');
 const pinError         = document.getElementById('pin-error');
 const shareSheet       = document.getElementById('share-sheet');
 const shareContent     = document.getElementById('share-content');
+const menuDrawer       = document.getElementById('menu-drawer');
 
 // ---- Init ----
 window.addEventListener('load', init);
@@ -42,9 +43,7 @@ window.addEventListener('load', init);
 async function init() {
   registerSW();
   setupEvents();
-  // Hide loading overlay so PIN modal is visible
   loadingOverlay.classList.add('hidden');
-  // Require PIN to access app
   if (!sessionStorage.getItem(SESSION_PIN)) {
     requirePin(() => loadApp());
   } else {
@@ -52,6 +51,8 @@ async function init() {
   }
 }
 
+// ---- Load App ----
+// Always try to show cached data immediately, then refresh from network in background.
 async function loadApp() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
@@ -62,12 +63,13 @@ async function loadApp() {
       renderList();
       showLastUpdated();
       loadingOverlay.classList.add('hidden');
-    } catch(e) {
-      await fetchFromWeb();
-    }
-  } else {
-    await fetchFromWeb();
+      // Silently refresh in background — show offline banner only if it fails
+      fetchFromWeb({ silent: true });
+      return;
+    } catch(e) { /* fall through to full fetch */ }
   }
+  // No cache — must fetch
+  await fetchFromWeb({ silent: false });
 }
 
 // ---- Service Worker ----
@@ -94,8 +96,11 @@ function registerSW() {
 }
 
 // ---- Fetch ----
-async function fetchFromWeb() {
-  loadingOverlay.classList.remove('hidden');
+// silent: true  → already showing cached data; don't show spinner, show offline banner on fail
+// silent: false → no cache; show spinner, show error message on fail
+async function fetchFromWeb({ silent = false } = {}) {
+  if (!silent) loadingOverlay.classList.remove('hidden');
+
   try {
     const [configRes, singersRes] = await Promise.all([
       fetch(`${API_URL}?action=getConfig`),
@@ -116,22 +121,49 @@ async function fetchFromWeb() {
     appConfig  = config;
     renderList();
     showLastUpdated();
+
+    // Hide offline banner if it was showing
+    document.getElementById('offline-banner').classList.add('hidden');
+
   } catch(err) {
     console.error('Fetch error:', err);
-    if (allSingers.length === 0) {
-      singerList.innerHTML = `<div class="empty-state"><p>⚠️ Could not load data.<br>Check connection and refresh.</p></div>`;
+
+    if (silent) {
+      // We're already showing cached data — just notify the user quietly
+      showOfflineBanner();
+    } else {
+      // No cache at all — this is a hard failure
+      if (allSingers.length === 0) {
+        singerList.innerHTML = `<div class="empty-state"><p>⚠️ Could not load data.<br>Check connection and refresh.</p></div>`;
+      }
     }
   } finally {
     loadingOverlay.classList.add('hidden');
   }
 }
 
+function showOfflineBanner() {
+  const banner = document.getElementById('offline-banner');
+  if (banner) banner.classList.remove('hidden');
+}
+
 // ---- Events ----
 function setupEvents() {
-  document.getElementById('btn-refresh').addEventListener('click', fetchFromWeb);
-  document.getElementById('btn-add').addEventListener('click', () => openAddSinger());
-  document.getElementById('btn-attendance').addEventListener('click', () => openAttendance());
-  document.getElementById('btn-share').addEventListener('click', openShareSheet);
+  // Hamburger menu
+  document.getElementById('btn-menu').addEventListener('click', openMenu);
+  document.getElementById('btn-close-menu').addEventListener('click', closeMenu);
+  document.querySelector('.drawer-backdrop').addEventListener('click', closeMenu);
+  document.getElementById('menu-share').addEventListener('click', () => { closeMenu(); openShareSheet(); });
+  document.getElementById('menu-attendance').addEventListener('click', () => { closeMenu(); openAttendance(); });
+  document.getElementById('menu-add').addEventListener('click', () => { closeMenu(); openAddSinger(); });
+  document.getElementById('menu-refresh').addEventListener('click', () => { closeMenu(); fetchFromWeb({ silent: false }); });
+
+  // Offline banner dismiss
+  document.getElementById('btn-dismiss-offline').addEventListener('click', () => {
+    document.getElementById('offline-banner').classList.add('hidden');
+  });
+
+  // Profile / Edit navigation
   document.getElementById('btn-back-profile').addEventListener('click', goHome);
   document.getElementById('btn-edit').addEventListener('click', () => openEditSinger(currentSinger));
   document.getElementById('btn-back-edit').addEventListener('click', () => {
@@ -141,9 +173,12 @@ function setupEvents() {
   });
   document.getElementById('btn-save').addEventListener('click', saveSinger);
   document.getElementById('btn-back-attendance').addEventListener('click', goHome);
+
+  // Share sheet
   document.getElementById('btn-close-share').addEventListener('click', closeShareSheet);
   document.querySelector('.bottom-sheet-backdrop').addEventListener('click', closeShareSheet);
 
+  // Search & filter
   searchInput.addEventListener('input', () => {
     btnClearSearch.classList.toggle('hidden', !searchInput.value);
     renderList();
@@ -159,10 +194,24 @@ function setupEvents() {
   });
   positionFilter.addEventListener('change', renderList);
 
+  // PIN
   document.querySelectorAll('.pin-key').forEach(btn => {
     btn.addEventListener('click', () => handlePinKey(btn.dataset.key));
   });
   document.querySelector('.modal-backdrop').addEventListener('click', closePinModal);
+}
+
+// ---- Hamburger Menu ----
+function openMenu() {
+  menuDrawer.classList.remove('hidden');
+  // Small delay so the CSS transition fires
+  requestAnimationFrame(() => menuDrawer.classList.add('open'));
+}
+
+function closeMenu() {
+  menuDrawer.classList.remove('open');
+  // Wait for slide-out transition before hiding
+  setTimeout(() => menuDrawer.classList.add('hidden'), 300);
 }
 
 // ---- Get filtered singers (shared logic) ----
@@ -172,7 +221,6 @@ function getFilteredSingers() {
   const position = positionFilter.value;
 
   return allSingers.filter(s => {
-    // Exclude HOLD unless explicitly filtering for it
     const isHold = String(s.seq) === '90' || s.section === 'HOLD' || s.position === 'HOLD';
     if (isHold && section !== 'HOLD') return false;
     if (!isHold && section === 'HOLD') return false;
@@ -199,7 +247,6 @@ function renderList() {
     return;
   }
 
-  // Group by SEQ — Tenor all together, Bass all together
   const groups = {};
   filtered.forEach(s => {
     const seq = parseInt(s.seq) || 0;
@@ -264,7 +311,7 @@ function updatePositionFilter() {
   const section   = sectionFilter.value;
   const positions = appConfig.positions || [];
   let relevant;
-  if (section === 'all')  relevant = positions.filter(p => p !== 'HOLD');
+  if (section === 'all')       relevant = positions.filter(p => p !== 'HOLD');
   else if (section === 'HOLD') relevant = ['HOLD'];
   else relevant = positions.filter(p => p.toLowerCase().startsWith(section.toLowerCase()));
 
@@ -277,7 +324,7 @@ function updatePositionFilter() {
 // ---- Profile Screen ----
 function openProfile(singer) {
   currentSinger = singer;
-  const dates   = appConfig.dates || [];
+  const dates    = appConfig.dates || [];
   const initials = getInitials(singer);
   const sectionClass = (singer.section || '').toLowerCase();
 
@@ -295,9 +342,9 @@ function openProfile(singer) {
 
   // Contact
   html += `<div class="info-section"><div class="info-section-title">Contact</div>`;
-  html += infoRow('Cell',    singer.cellPhone ? phoneLink(singer.cellPhone) : '');
-  html += infoRow('Home',    singer.homePhone ? phoneLink(singer.homePhone) : '');
-  html += infoRow('Email',   singer.email     ? `<a href="mailto:${escHtml(singer.email)}" style="color:var(--navy-light)">${escHtml(singer.email)}</a>` : '');
+  html += infoRow('Cell',  singer.cellPhone ? phoneLink(singer.cellPhone) : '');
+  html += infoRow('Home',  singer.homePhone ? phoneLink(singer.homePhone) : '');
+  html += infoRow('Email', singer.email ? `<a href="mailto:${escHtml(singer.email)}" style="color:var(--navy-light)">${escHtml(singer.email)}</a>` : '');
   if (singer.address1) {
     const addr = [singer.address1, singer.city, singer.state, singer.zip].filter(Boolean).join(', ');
     html += infoRow('Address', escHtml(addr));
@@ -458,7 +505,7 @@ async function saveSinger() {
     notes2:    document.getElementById('f-notes2').value.trim(),
   };
 
-  const isNew = !currentSinger;
+  const isNew  = !currentSinger;
   const seqNum = getSeqForPosition(singerData.position);
   singerData.seq = String(seqNum);
 
@@ -660,7 +707,6 @@ function isValidEmail(email) {
 function buildShareContent() {
   const filtered = getFilteredSingers();
 
-  // Sort by SEQ then lastname
   const seqOrder = [10,20,30,40,50,60];
   const sorted = [...filtered].sort((a, b) => {
     const sa = parseInt(a.seq) || 99;
@@ -673,10 +719,9 @@ function buildShareContent() {
     return a.lastname.localeCompare(b.lastname);
   });
 
-  const withPhone  = sorted.filter(s => s.cellPhone && s.cellPhone.trim());
+  const withPhone   = sorted.filter(s => s.cellPhone && s.cellPhone.trim());
   const validEmails = sorted.filter(s => isValidEmail(s.email)).map(s => s.email.trim());
 
-  // Build text groups of 10 in order
   const textGroups = [];
   let groupNum = 0;
   let currentGroup = null;
@@ -700,7 +745,6 @@ function buildShareContent() {
     <strong>${validEmails.length}</strong> with valid email
   </div>`;
 
-  // Text Groups
   html += `<div class="share-section-title">📱 Text Groups</div>`;
   if (textGroups.length === 0) {
     html += `<p style="font-size:13px;color:var(--text-light)">No singers with phone numbers in current selection.</p>`;
@@ -717,7 +761,6 @@ function buildShareContent() {
     });
   }
 
-  // Email
   html += `<div class="share-section-title">✉️ Email List</div>`;
   if (validEmails.length === 0) {
     html += `<p style="font-size:13px;color:var(--text-light)">No valid email addresses in current selection.</p>`;
@@ -737,7 +780,6 @@ function buildShareContent() {
 
   shareContent.innerHTML = html;
 
-  // Wire up copy buttons
   shareContent.querySelectorAll('[data-copy-id]').forEach(btn => {
     btn.addEventListener('click', () => {
       const el = document.getElementById(btn.dataset.copyId);
@@ -745,12 +787,10 @@ function buildShareContent() {
     });
   });
 
-  // Wire up mail button
   const mailBtn = document.getElementById('btn-open-mail');
   if (mailBtn) {
     mailBtn.addEventListener('click', () => {
       const mailto = decodeURIComponent(mailBtn.dataset.mailto);
-      // Use a temporary anchor for maximum iOS compatibility
       const a = document.createElement('a');
       a.href = mailto;
       a.style.display = 'none';
@@ -773,7 +813,6 @@ function copyText(text, btn) {
     setTimeout(() => btn.textContent = orig, 2000);
   };
 
-  // Modern clipboard API
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(text).then(success).catch(() => fallbackCopy(text, success));
     return;
@@ -782,7 +821,6 @@ function copyText(text, btn) {
 }
 
 function fallbackCopy(text, success) {
-  // iOS-compatible fallback
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.position = 'fixed';
@@ -791,7 +829,6 @@ function fallbackCopy(text, success) {
   ta.setAttribute('readonly', '');
   document.body.appendChild(ta);
 
-  // iOS requires this specific approach
   const range = document.createRange();
   range.selectNodeContents(ta);
   const sel = window.getSelection();
@@ -857,6 +894,7 @@ function closePinModal() {
 
 // ---- Navigation ----
 function goHome() {
+  closeMenu();
   [screenProfile, screenEdit, screenAttendance].forEach(s => slideOut(s));
   screenHome.classList.remove('slide-out');
   screenHome.classList.add('active');
