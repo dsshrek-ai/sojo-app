@@ -285,6 +285,12 @@ function renderList() {
       if (s.new2026 === 'Y')  badges.push('<span class="badge badge-new">New</span>');
       if (s.verified === 'Y') badges.push('<span class="badge badge-verify">✓</span>');
       if (s.iphone === 'Y')   badges.push('<span class="badge badge-iphone">📱</span>');
+
+      const missing = getMissingFields(s);
+      if (missing.length > 0) {
+        badges.push(`<span class="badge badge-missing" data-id="${escHtml(s.id)}">⚠ Info</span>`);
+      }
+
       html += `<div class="singer-card" data-id="${escHtml(s.id)}">
         <div class="singer-avatar ${sectionClass}">${initials}</div>
         <div class="singer-info">
@@ -300,9 +306,20 @@ function renderList() {
   singerList.innerHTML = html;
 
   document.querySelectorAll('.singer-card').forEach(card => {
-    card.addEventListener('click', () => {
+    card.addEventListener('click', (e) => {
+      // Don't open profile if the missing-info badge was tapped
+      if (e.target.closest('.badge-missing')) return;
       const singer = allSingers.find(s => String(s.id) === card.dataset.id);
       if (singer) openProfile(singer);
+    });
+  });
+
+  // Wire up missing info badges
+  document.querySelectorAll('.badge-missing').forEach(badge => {
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const singer = allSingers.find(s => String(s.id) === badge.dataset.id);
+      if (singer) showMissingInfoModal(singer);
     });
   });
 }
@@ -319,6 +336,41 @@ function updatePositionFilter() {
   relevant.forEach(p => {
     positionFilter.innerHTML += `<option value="${escHtml(p)}">${escHtml(p)}</option>`;
   });
+}
+
+// ---- Missing Info ----
+function getMissingFields(singer) {
+  const missing = [];
+  if (!singer.cellPhone || !singer.cellPhone.trim()) missing.push('Cell Phone');
+  if (!singer.address1  || !singer.address1.trim())  missing.push('Address');
+  if (!singer.email     || !singer.email.trim())     missing.push('Email');
+  if (!singer.height    || !singer.height.trim())    missing.push('Height');
+  return missing;
+}
+
+function showMissingInfoModal(singer) {
+  const missing = getMissingFields(singer);
+  const name    = `${singer.firstname} ${singer.lastname}`.trim();
+
+  // Remove any existing missing-info modal
+  const existing = document.getElementById('missing-info-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'missing-info-modal';
+  modal.className = 'missing-modal';
+  modal.innerHTML = `
+    <div class="missing-modal-box">
+      <div class="missing-modal-title">Missing Info</div>
+      <div class="missing-modal-name">${escHtml(name)}</div>
+      <ul class="missing-modal-list">
+        ${missing.map(f => `<li>${escHtml(f)}</li>`).join('')}
+      </ul>
+      <p class="missing-modal-hint">Tap anywhere to dismiss</p>
+    </div>`;
+
+  modal.addEventListener('click', () => modal.remove());
+  document.body.appendChild(modal);
 }
 
 // ---- Profile Screen ----
@@ -357,8 +409,8 @@ function openProfile(singer) {
   html += infoRow('Position', escHtml(singer.position));
   html += infoRow('Folder',   escHtml(singer.folder));
   html += infoRow('Height',   escHtml(singer.height));
-  if (singer.notes)  html += infoRow('Notes',   escHtml(singer.notes));
-  if (singer.notes2) html += infoRow('Notes 2', escHtml(singer.notes2));
+  html += infoRow('Notes',   escHtml(singer.notes));
+  html += infoRow('Notes 2', escHtml(singer.notes2));
   html += `</div>`;
 
   // Attendance
