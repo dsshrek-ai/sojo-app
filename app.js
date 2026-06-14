@@ -290,6 +290,12 @@ function renderList() {
         badges.push(`<span class="badge badge-missing" data-id="${escHtml(s.id)}">⚠ Info</span>`);
       }
 
+      const neededActions = computeNeededActions(s);
+      const pendingActions = neededActions & ~(s.actionTaken || 0);
+      if (pendingActions) {
+        badges.push(`<span class="badge badge-action" data-id="${escHtml(s.id)}">! Action</span>`);
+      }
+
       const hasNote = !!(s.notes || '').trim();
       html += `<div class="singer-card" data-id="${escHtml(s.id)}">
         <div class="singer-avatar ${sectionClass}">${initials}</div>
@@ -311,9 +317,18 @@ function renderList() {
   document.querySelectorAll('.singer-card').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('.badge-missing')) return;
-      if (e.target.closest('.note-btn')) return;
+      if (e.target.closest('.badge-action'))  return;
+      if (e.target.closest('.note-btn'))      return;
       const singer = allSingers.find(s => String(s.id) === card.dataset.id);
       if (singer) openProfile(singer);
+    });
+  });
+
+  document.querySelectorAll('.badge-action').forEach(badge => {
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const singer = allSingers.find(s => String(s.id) === badge.dataset.id);
+      if (singer) openActionModal(singer);
     });
   });
 
@@ -382,6 +397,114 @@ function showMissingInfoModal(singer) {
 
   modal.addEventListener('click', () => modal.remove());
   document.body.appendChild(modal);
+}
+
+// ---- Action Flags ----
+// Bit 0 (1): 2+ consecutive O's  → contact: still singing?
+// Bit 1 (2): 3+ total O's        → contact: still singing?
+// Bit 2 (4): 4+ total O's        → contact: get music back
+function computeNeededActions(singer) {
+  const dates = appConfig.dates || [];
+  let flags = 0;
+  let totalMisses = 0;
+  let consec = 0;
+  let maxConsec = 0;
+
+  dates.forEach(d => {
+    const v = (singer.attendance[d.col] || '').trim();
+    if (v === 'O') {
+      totalMisses++;
+      consec++;
+      if (consec > maxConsec) maxConsec = consec;
+    } else {
+      consec = 0;
+    }
+  });
+
+  if (maxConsec >= 2) flags |= 1;
+  if (totalMisses >= 3) flags |= 2;
+  if (totalMisses >= 4) flags |= 4;
+  return flags;
+}
+
+const ACTION_DEFS = [
+  { bit: 1, label: 'Contacted — missed 2 in a row',    desc: 'Reach out to confirm they are still singing with us.' },
+  { bit: 2, label: 'Contacted — missed 3 total',       desc: 'Reach out to confirm they are still singing with us.' },
+  { bit: 4, label: 'Contacted — missed 4 total',       desc: 'Reach out to arrange return of their music.' },
+];
+
+function openActionModal(singer) {
+  const existing = document.getElementById('action-modal');
+  if (existing) existing.remove();
+
+  const needed  = computeNeededActions(singer);
+  const taken   = Number(singer.actionTaken || 0);
+  const name    = `${singer.firstname} ${singer.lastname}`.trim();
+
+  const rows = ACTION_DEFS.filter(a => needed & a.bit).map(a => {
+    const checked = (taken & a.bit) ? 'checked' : '';
+    return `<label class="action-checkbox-row">
+      <input type="checkbox" class="action-cb" data-bit="${a.bit}" ${checked}>
+      <div class="action-cb-text">
+        <div class="action-cb-label">${escHtml(a.label)}</div>
+        <div class="action-cb-desc">${escHtml(a.desc)}</div>
+      </div>
+    </label>`;
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'action-modal';
+  modal.className = 'action-modal';
+  modal.innerHTML = `
+    <div class="action-modal-box">
+      <div class="action-modal-header">
+        <div class="action-modal-title">Actions — ${escHtml(name)}</div>
+        <button class="note-modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="action-modal-body">${rows}</div>
+      <div class="note-modal-footer">
+        <button class="note-modal-save" id="action-modal-save">Save</button>
+      </div>
+    </div>`;
+
+  modal.querySelector('.note-modal-close').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  modal.querySelector('#action-modal-save').addEventListener('click', () => saveActionTaken(singer, modal, needed));
+
+  document.body.appendChild(modal);
+}
+
+async function saveActionTaken(singer, modal, needed) {
+  const pin = sessionStorage.getItem(SESSION_PIN);
+  let newTaken = Number(singer.actionTaken || 0);
+
+  modal.querySelectorAll('.action-cb').forEach(cb => {
+    const bit = parseInt(cb.dataset.bit);
+    if (cb.checked) newTaken |= bit;
+    else            newTaken &= ~bit;
+  });
+
+  const saveBtn = modal.querySelector('#action-modal-save');
+  saveBtn.textContent = 'Saving…';
+  saveBtn.disabled = true;
+
+  try {
+    const singerData = { ...singer, actionTaken: newTaken };
+    const body = { action: 'updateSinger', pin, id: singer.id, singer: singerData };
+    const res  = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const idx = allSingers.findIndex(s => s.id === singer.id);
+    if (idx >= 0) allSingers[idx].actionTaken = newTaken;
+
+    modal.remove();
+    renderList();
+  } catch(err) {
+    alert('Save failed: ' + err.message);
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled = false;
+  }
 }
 
 // ---- Note Modal ----

@@ -10,31 +10,32 @@ const ADMIN_PIN  = '0127'; // Change before distributing
 // G=6:Combined, H=7:iPhone, I=8:Address1, J=9:City, K=10:State, L=11:Zip
 // M=12:Email, N=13:HomePhone, O=14:CellPhone, P=15:Notes2
 // Q=16:Height, R=17:Pic, S=18:Verified, T=19:New2026
-// U=20:Folder, V=21:Notes, W=22+: dates
+// U=20:Folder, V=21:Notes, W=22:ActionTaken, X=23+: dates
 const COL = {
-  ID:         0,
-  SEQ:        1,
-  SECTION:    2,
-  POSITION:   3,
-  LASTNAME:   4,
-  FIRSTNAME:  5,
-  COMBINED:   6,
-  IPHONE:     7,
-  ADDRESS1:   8,
-  CITY:       9,
-  STATE:      10,
-  ZIP:        11,
-  EMAIL:      12,
-  HOMEPHONE:  13,
-  CELLPHONE:  14,
-  NOTES2:     15,
-  HEIGHT:     16,
-  PIC:        17,
-  VERIFIED:   18,
-  NEW2026:    19,
-  FOLDER:     20,
-  NOTES:      21,
-  FIRST_DATE: 22
+  ID:           0,
+  SEQ:          1,
+  SECTION:      2,
+  POSITION:     3,
+  LASTNAME:     4,
+  FIRSTNAME:    5,
+  COMBINED:     6,
+  IPHONE:       7,
+  ADDRESS1:     8,
+  CITY:         9,
+  STATE:        10,
+  ZIP:          11,
+  EMAIL:        12,
+  HOMEPHONE:    13,
+  CELLPHONE:    14,
+  NOTES2:       15,
+  HEIGHT:       16,
+  PIC:          17,
+  VERIFIED:     18,
+  NEW2026:      19,
+  FOLDER:       20,
+  NOTES:        21,
+  ACTION_TAKEN: 22,
+  FIRST_DATE:   23
 };
 
 const SECTIONS  = ['Soprano', 'Alto', 'Tenor', 'Bass', 'HOLD'];
@@ -165,8 +166,11 @@ function updateSinger(body) {
       sheet.getRange(r, COL.VERIFIED  + 1).setValue(s.verified  || '');
       sheet.getRange(r, COL.NEW2026   + 1).setValue(s.new2026   || '');
       sheet.getRange(r, COL.IPHONE    + 1).setValue(s.iphone    || '');
-      sheet.getRange(r, COL.FOLDER    + 1).setValue(s.folder    || '');
-      sheet.getRange(r, COL.NOTES     + 1).setValue(s.notes     || '');
+      sheet.getRange(r, COL.FOLDER       + 1).setValue(s.folder       || '');
+      sheet.getRange(r, COL.NOTES        + 1).setValue(s.notes        || '');
+      if (s.actionTaken !== undefined) {
+        sheet.getRange(r, COL.ACTION_TAKEN + 1).setValue(Number(s.actionTaken) || 0);
+      }
       return respond({ success: true });
     }
   }
@@ -259,7 +263,8 @@ function rowToSinger(row, headers) {
     new2026:   String(row[COL.NEW2026]   || ''),
     iphone:    String(row[COL.IPHONE]    || ''),
     folder:    String(row[COL.FOLDER]    || ''),
-    notes:     String(row[COL.NOTES]     || ''),
+    notes:       String(row[COL.NOTES]        || ''),
+    actionTaken: Number(row[COL.ACTION_TAKEN] || 0),
     attendance: {}
   };
 
