@@ -7,7 +7,7 @@ const ADMIN_PIN  = '0127'; // Change before distributing
 
 // ---- Column definitions (0-based) ----
 // A=0:ID, B=1:SEQ, C=2:Section, D=3:Position, E=4:Lastname, F=5:Firstname
-// G=6:Combined, H=7:Address1, I=8:City, J=9:State, K=10:Zip
+// G=6:Combined, H=7:Address1, I=8:City, J=9:State, K=10:(?), L=11:Zip
 // M=12:Email, N=13:HomePhone, O=14:CellPhone, P=15:Notes2
 // Q=16:Height, R=17:Pic, S=18:Verified, T=19:New2026
 // U=20:iPhone, V=21:ActionTaken, W=22:Folder, X=23:Notes, Y=24+: dates
@@ -22,7 +22,7 @@ const COL = {
   ADDRESS1:     7,
   CITY:         8,
   STATE:        9,
-  ZIP:          10,
+  ZIP:          11,
   EMAIL:        12,
   HOMEPHONE:    13,
   CELLPHONE:    14,
