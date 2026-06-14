@@ -7,10 +7,10 @@ const ADMIN_PIN  = '0127'; // Change before distributing
 
 // ---- Column definitions (0-based) ----
 // A=0:ID, B=1:SEQ, C=2:Section, D=3:Position, E=4:Lastname, F=5:Firstname
-// G=6:Combined, H=7:Address1, I=8:City, J=9:State, K=10:Zip
-// L=11:Email, M=12:HomePhone, N=13:CellPhone, O=14:Notes2
-// P=15:Height, Q=16:Pic, R=17:Verified, S=18:New2026
-// T=19:iPhone, U=20:Folder, V=21:Notes, W=22+: dates
+// G=6:Combined, H=7:iPhone, I=8:Address1, J=9:City, K=10:State, L=11:Zip
+// M=12:Email, N=13:HomePhone, O=14:CellPhone, P=15:Notes2
+// Q=16:Height, R=17:Pic, S=18:Verified, T=19:New2026
+// U=20:Folder, V=21:Notes, W=22+: dates
 const COL = {
   ID:         0,
   SEQ:        1,
@@ -19,19 +19,19 @@ const COL = {
   LASTNAME:   4,
   FIRSTNAME:  5,
   COMBINED:   6,
-  ADDRESS1:   7,
-  CITY:       8,
-  STATE:      9,
-  ZIP:        10,
-  EMAIL:      11,
-  HOMEPHONE:  12,
-  CELLPHONE:  13,
-  NOTES2:     14,
-  HEIGHT:     15,
-  PIC:        16,
-  VERIFIED:   17,
-  NEW2026:    18,
-  IPHONE:     19,
+  IPHONE:     7,
+  ADDRESS1:   8,
+  CITY:       9,
+  STATE:      10,
+  ZIP:        11,
+  EMAIL:      12,
+  HOMEPHONE:  13,
+  CELLPHONE:  14,
+  NOTES2:     15,
+  HEIGHT:     16,
+  PIC:        17,
+  VERIFIED:   18,
+  NEW2026:    19,
   FOLDER:     20,
   NOTES:      21,
   FIRST_DATE: 22
