@@ -428,26 +428,31 @@ function computeNeededActions(singer) {
 }
 
 const ACTION_DEFS = [
-  { bit: 1, label: 'Contacted — missed 2 in a row',    desc: 'Reach out to confirm they are still singing with us.' },
-  { bit: 2, label: 'Contacted — missed 3 total',       desc: 'Reach out to confirm they are still singing with us.' },
-  { bit: 4, label: 'Contacted — missed 4 total',       desc: 'Reach out to arrange return of their music.' },
+  { bit: 1, reason: 'missed 2 in a row',  required: 'Contact required — confirm they are still singing with us.',  done: 'Contacted — confirmed still singing (2 in a row).' },
+  { bit: 2, reason: 'missed 3 total',     required: 'Contact required — confirm they are still singing with us.',  done: 'Contacted — confirmed still singing (3 total).' },
+  { bit: 4, reason: 'missed 4 total',     required: 'Contact required — arrange return of their music.',            done: 'Contacted — music return arranged.' },
 ];
 
 function openActionModal(singer) {
   const existing = document.getElementById('action-modal');
   if (existing) existing.remove();
 
-  const needed  = computeNeededActions(singer);
-  const taken   = Number(singer.actionTaken || 0);
-  const name    = `${singer.firstname} ${singer.lastname}`.trim();
+  const needed = computeNeededActions(singer);
+  const taken  = Number(singer.actionTaken || 0);
+  const name   = `${singer.firstname} ${singer.lastname}`.trim();
 
-  const rows = ACTION_DEFS.filter(a => needed & a.bit).map(a => {
-    const checked = (taken & a.bit) ? 'checked' : '';
-    return `<label class="action-checkbox-row">
+  // Only show actions that have been triggered
+  const triggered = ACTION_DEFS.filter(a => needed & a.bit);
+
+  const rows = triggered.map(a => {
+    const isDone    = !!(taken & a.bit);
+    const checked   = isDone ? 'checked' : '';
+    const labelText = isDone ? a.done : a.required;
+    const rowClass  = isDone ? 'action-checkbox-row done' : 'action-checkbox-row';
+    return `<label class="${rowClass}">
       <input type="checkbox" class="action-cb" data-bit="${a.bit}" ${checked}>
       <div class="action-cb-text">
-        <div class="action-cb-label">${escHtml(a.label)}</div>
-        <div class="action-cb-desc">${escHtml(a.desc)}</div>
+        <div class="action-cb-label">${escHtml(labelText)}</div>
       </div>
     </label>`;
   }).join('');
@@ -469,12 +474,25 @@ function openActionModal(singer) {
 
   modal.querySelector('.note-modal-close').addEventListener('click', () => modal.remove());
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-  modal.querySelector('#action-modal-save').addEventListener('click', () => saveActionTaken(singer, modal, needed));
+
+  // Swap label text when checkbox is toggled
+  modal.querySelectorAll('.action-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const bit  = parseInt(cb.dataset.bit);
+      const def  = ACTION_DEFS.find(a => a.bit === bit);
+      const row  = cb.closest('.action-checkbox-row');
+      const lbl  = row.querySelector('.action-cb-label');
+      if (cb.checked) { row.classList.add('done');    lbl.textContent = def.done; }
+      else            { row.classList.remove('done'); lbl.textContent = def.required; }
+    });
+  });
+
+  modal.querySelector('#action-modal-save').addEventListener('click', () => saveActionTaken(singer, modal));
 
   document.body.appendChild(modal);
 }
 
-async function saveActionTaken(singer, modal, needed) {
+async function saveActionTaken(singer, modal) {
   const pin = sessionStorage.getItem(SESSION_PIN);
   let newTaken = Number(singer.actionTaken || 0);
 

@@ -1287,9 +1287,12 @@ html, body {
   border: 1.5px solid var(--gray-light);
   transition: border-color 0.15s, background 0.15s;
 }
-.action-checkbox-row:has(.action-cb:checked) {
+.action-checkbox-row.done {
   border-color: #15803d;
   background: #f0fdf4;
+}
+.action-checkbox-row.done .action-cb-label {
+  color: #15803d;
 }
 .action-cb {
   margin-top: 2px;
