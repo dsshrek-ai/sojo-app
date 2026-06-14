@@ -428,9 +428,9 @@ function computeNeededActions(singer) {
 }
 
 const ACTION_DEFS = [
-  { bit: 1, reason: 'missed 2 in a row',  required: 'Contact required — confirm they are still singing with us.',  done: 'Contacted — confirmed still singing (2 in a row).' },
-  { bit: 2, reason: 'missed 3 total',     required: 'Contact required — confirm they are still singing with us.',  done: 'Contacted — confirmed still singing (3 total).' },
-  { bit: 4, reason: 'missed 4 total',     required: 'Contact required — arrange return of their music.',            done: 'Contacted — music return arranged.' },
+  { bit: 1, required: 'Contact required — missed 2 in a row.',         done: 'Contacted — missed 2 in a row.' },
+  { bit: 2, required: 'Contact required — 3 or more total misses.',    done: 'Contacted — 3 or more total misses.' },
+  { bit: 4, required: 'Contact required — arrange return of music.',   done: 'Contacted — music return arranged.' },
 ];
 
 function openActionModal(singer) {
