@@ -570,6 +570,8 @@ html, body {
 .att-X .att-code { color: var(--att-present); }
 .att-O  { background: var(--att-out-bg); }
 .att-O .att-code { color: var(--att-out); }
+.att-E  { background: #ede9fe; }
+.att-E .att-code { color: #7c3aed; }
 .att-blank { background: var(--att-unknown-bg); }
 .att-blank .att-code { color: var(--att-unknown); }
 
@@ -596,6 +598,7 @@ html, body {
 
 .legend-X     { background: var(--att-present-bg); border: 1.5px solid var(--att-present); }
 .legend-O     { background: var(--att-out-bg);     border: 1.5px solid var(--att-out); }
+.legend-E     { background: #ede9fe;               border: 1.5px solid #7c3aed; }
 .legend-blank { background: var(--att-unknown-bg); border: 1.5px solid var(--gray); }
 
 /* ============ EDIT FORM ============ */
@@ -774,6 +777,12 @@ html, body {
   background: var(--att-out-bg);
   border-color: var(--att-out);
   color: var(--att-out);
+}
+
+.att-btn.active-E {
+  background: #ede9fe;
+  border-color: #7c3aed;
+  color: #7c3aed;
 }
 
 .att-btn.active-blank {

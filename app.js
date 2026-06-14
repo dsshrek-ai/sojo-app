@@ -417,7 +417,7 @@ function computeNeededActions(singer) {
       consec++;
       if (consec > maxConsec) maxConsec = consec;
     } else {
-      consec = 0;
+      consec = 0; // X, E, or blank all reset the consecutive streak
     }
   });
 
@@ -654,12 +654,13 @@ function openProfile(singer) {
       <div class="att-legend">
         <div class="att-legend-item"><div class="legend-dot legend-X"></div> Present</div>
         <div class="att-legend-item"><div class="legend-dot legend-O"></div> Absent</div>
+        <div class="att-legend-item"><div class="legend-dot legend-E"></div> Exempt</div>
         <div class="att-legend-item"><div class="legend-dot legend-blank"></div> Unknown</div>
       </div>
       <div class="attendance-grid">`;
     dates.forEach(d => {
       const code = (singer.attendance[d.col] || '').trim();
-      const cellClass = code === 'X' ? 'att-X' : code === 'O' ? 'att-O' : 'att-blank';
+      const cellClass = code === 'X' ? 'att-X' : code === 'O' ? 'att-O' : code === 'E' ? 'att-E' : 'att-blank';
       html += `<div class="att-cell ${cellClass}">
         <div class="att-date">${formatShortDate(d.label)}</div>
         <div class="att-code">${escHtml(code || '–')}</div>
@@ -922,6 +923,7 @@ function renderAttendanceRows() {
         <div class="att-buttons">
           <button class="att-btn${current === 'X' ? ' active-X' : ''}" data-id="${escHtml(s.id)}" data-val="X">X</button>
           <button class="att-btn${current === 'O' ? ' active-O' : ''}" data-id="${escHtml(s.id)}" data-val="O">O</button>
+          <button class="att-btn${current === 'E' ? ' active-E' : ''}" data-id="${escHtml(s.id)}" data-val="E">E</button>
           <button class="att-btn${current === ''  ? ' active-blank' : ''}" data-id="${escHtml(s.id)}" data-val="">–</button>
         </div>
       </div>`;
