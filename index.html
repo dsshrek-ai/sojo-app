@@ -142,33 +142,22 @@
   </div>
 </div>
 
-<!-- PIN Modal -->
-<div id="pin-modal" class="modal hidden">
+<!-- Login Modal -->
+<div id="login-modal" class="modal hidden">
   <div class="modal-backdrop"></div>
   <div class="modal-box">
     <h2>SOJO Directory</h2>
-    <p>Enter PIN to access</p>
-    <div class="pin-dots">
-      <span class="pin-dot" id="dot-0"></span>
-      <span class="pin-dot" id="dot-1"></span>
-      <span class="pin-dot" id="dot-2"></span>
-      <span class="pin-dot" id="dot-3"></span>
+    <p>Log in to continue</p>
+    <div class="form-row" style="text-align:left">
+      <label class="form-label" for="login-email">Email</label>
+      <input class="form-input" type="email" id="login-email" autocomplete="username">
     </div>
-    <div id="pin-error" class="pin-error hidden">Incorrect PIN</div>
-    <div class="pin-keypad">
-      <button class="pin-key" data-key="1">1</button>
-      <button class="pin-key" data-key="2">2</button>
-      <button class="pin-key" data-key="3">3</button>
-      <button class="pin-key" data-key="4">4</button>
-      <button class="pin-key" data-key="5">5</button>
-      <button class="pin-key" data-key="6">6</button>
-      <button class="pin-key" data-key="7">7</button>
-      <button class="pin-key" data-key="8">8</button>
-      <button class="pin-key" data-key="9">9</button>
-      <button class="pin-key pin-cancel" data-key="cancel">✕</button>
-      <button class="pin-key" data-key="0">0</button>
-      <button class="pin-key pin-delete" data-key="delete">⌫</button>
+    <div class="form-row" style="text-align:left">
+      <label class="form-label" for="login-password">Password</label>
+      <input class="form-input" type="password" id="login-password" autocomplete="current-password">
     </div>
+    <div id="login-error" class="pin-error hidden">Incorrect email or password.</div>
+    <button class="save-btn" id="login-submit" style="width:100%;margin-top:8px">Log In</button>
   </div>
 </div>
 

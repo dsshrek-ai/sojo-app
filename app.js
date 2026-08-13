@@ -1,12 +1,14 @@
 /* ============================================
-   SOJO App — Google Apps Script API
+   SOJO App — MyDataWorld-backed API (proxies to the existing
+   Google Apps Script / Sheet backend; see api/api.php)
    ============================================ */
 
-const API_URL         = 'https://script.google.com/macros/s/AKfycbyMzS0N4UhQx32FEN3_delMMaeCoajsuFJUpQDSfzEsTN_nH-WcnheTw88izVtRud-s/exec';
+const API_URL         = 'https://seniorfamily.org/sojo-api/api.php';
 const STORAGE_KEY     = 'sojoAllData';
 const STORAGE_BACKUP  = 'sojoAllDataBackup';
 const STORAGE_UPDATED = 'sojoLastUpdated';
-const SESSION_PIN     = 'sojoPinVerified';
+const STORAGE_AUTH_TOKEN = 'sojoAuthToken';
+const STORAGE_AUTH_NAME  = 'sojoAuthName';
 
 // ---- State ----
 let allSingers    = [];
@@ -14,6 +16,11 @@ let appConfig     = {};
 let currentSinger = null;
 let pendingAction = null;
 let attDateCol    = null;
+// Session-scoped, not localStorage: this app shows real member data (home
+// addresses, phone numbers, emails), so on a shared computer the login
+// clears itself when the tab closes — same as the PIN it replaces did.
+let authToken = sessionStorage.getItem(STORAGE_AUTH_TOKEN) || null;
+let authName  = sessionStorage.getItem(STORAGE_AUTH_NAME) || null;
 
 // ---- DOM ----
 const screenHome       = document.getElementById('screen-home');
@@ -31,8 +38,8 @@ const editContent      = document.getElementById('edit-content');
 const attContent       = document.getElementById('attendance-content');
 const loadingOverlay   = document.getElementById('loading-overlay');
 const lastUpdated      = document.getElementById('last-updated');
-const pinModal         = document.getElementById('pin-modal');
-const pinError         = document.getElementById('pin-error');
+const loginModal       = document.getElementById('login-modal');
+const loginError       = document.getElementById('login-error');
 const shareSheet       = document.getElementById('share-sheet');
 const shareContent     = document.getElementById('share-content');
 const menuDrawer       = document.getElementById('menu-drawer');
@@ -44,10 +51,30 @@ async function init() {
   registerSW();
   setupEvents();
   loadingOverlay.classList.add('hidden');
-  if (!sessionStorage.getItem(SESSION_PIN)) {
-    requirePin(() => loadApp());
-  } else {
+
+  // Single sign-on: My Apps Hub launches this app with ?token=... when the
+  // visitor is already logged in there, so this skips the login screen.
+  const ssoToken = new URLSearchParams(window.location.search).get('token');
+  if (ssoToken) {
+    authToken = ssoToken;
+    authName = null;
+    sessionStorage.setItem(STORAGE_AUTH_TOKEN, authToken);
+    sessionStorage.removeItem(STORAGE_AUTH_NAME);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  if (!authToken) {
+    requireLogin(() => loadApp());
+    return;
+  }
+
+  try {
+    const data = await apiFetch('checkAccess');
+    authName = data.displayName;
+    sessionStorage.setItem(STORAGE_AUTH_NAME, authName || '');
     await loadApp();
+  } catch (e) {
+    requireLogin(() => loadApp());
   }
 }
 
@@ -102,13 +129,10 @@ async function fetchFromWeb({ silent = false } = {}) {
   if (!silent) loadingOverlay.classList.remove('hidden');
 
   try {
-    const [configRes, singersRes] = await Promise.all([
-      fetch(`${API_URL}?action=getConfig`),
-      fetch(`${API_URL}?action=getSingers`)
+    const [config, singers] = await Promise.all([
+      apiFetch('getConfig'),
+      apiFetch('getSingers')
     ]);
-    const config  = await configRes.json();
-    const singers = await singersRes.json();
-    if (config.error || singers.error) throw new Error(config.error || singers.error);
 
     const current = localStorage.getItem(STORAGE_KEY);
     if (current) localStorage.setItem(STORAGE_BACKUP, current);
@@ -193,11 +217,10 @@ function setupEvents() {
   });
   positionFilter.addEventListener('change', renderList);
 
-  // PIN
-  document.querySelectorAll('.pin-key').forEach(btn => {
-    btn.addEventListener('click', () => handlePinKey(btn.dataset.key));
-  });
-  document.querySelector('.modal-backdrop').addEventListener('click', closePinModal);
+  // Login
+  document.getElementById('login-submit').addEventListener('click', attemptLogin);
+  document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+  document.querySelector('.modal-backdrop').addEventListener('click', closeLoginModal);
 }
 
 // ---- Hamburger Menu ----
@@ -493,7 +516,6 @@ function openActionModal(singer) {
 }
 
 async function saveActionTaken(singer, modal) {
-  const pin = sessionStorage.getItem(SESSION_PIN);
   let newTaken = Number(singer.actionTaken || 0);
 
   modal.querySelectorAll('.action-cb').forEach(cb => {
@@ -508,10 +530,7 @@ async function saveActionTaken(singer, modal) {
 
   try {
     const singerData = { ...singer, actionTaken: newTaken };
-    const body = { action: 'updateSinger', pin, id: singer.id, singer: singerData };
-    const res  = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    await apiFetch('updateSinger', { method: 'POST', body: { id: singer.id, singer: singerData } });
 
     const idx = allSingers.findIndex(s => s.id === singer.id);
     if (idx >= 0) allSingers[idx].actionTaken = newTaken;
@@ -555,7 +574,6 @@ function openNoteModal(singer) {
 }
 
 async function saveNote(singer, modal) {
-  const pin  = sessionStorage.getItem(SESSION_PIN);
   const text = document.getElementById('note-modal-text').value.trim();
   const saveBtn = document.getElementById('note-modal-save');
   saveBtn.textContent = 'Saving…';
@@ -563,10 +581,7 @@ async function saveNote(singer, modal) {
 
   try {
     const singerData = { ...singer, notes: text };
-    const body = { action: 'updateSinger', pin, id: singer.id, singer: singerData };
-    const res  = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    await apiFetch('updateSinger', { method: 'POST', body: { id: singer.id, singer: singerData } });
 
     const idx = allSingers.findIndex(s => s.id === singer.id);
     if (idx >= 0) allSingers[idx].notes = text;
@@ -761,8 +776,6 @@ function checkRow(id, label, checked) {
 }
 
 async function saveSinger() {
-  const pin = sessionStorage.getItem(SESSION_PIN);
-
   const singerData = {
     firstname: document.getElementById('f-firstname').value.trim(),
     lastname:  document.getElementById('f-lastname').value.trim(),
@@ -788,16 +801,12 @@ async function saveSinger() {
   const seqNum = getSeqForPosition(singerData.position);
   singerData.seq = String(seqNum);
 
-  const body = { action: 'updateSinger', pin, id: currentSinger.id, singer: singerData };
-
   const saveBtn = document.getElementById('btn-save');
   saveBtn.textContent = 'Saving…';
   saveBtn.disabled = true;
 
   try {
-    const res  = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    await apiFetch('updateSinger', { method: 'POST', body: { id: currentSinger.id, singer: singerData } });
 
     const idx = allSingers.findIndex(s => s.id === currentSinger.id);
     if (idx >= 0) {
@@ -833,16 +842,13 @@ function getSeqForPosition(position) {
 async function openAttendance() {
   if (!appConfig.dates || appConfig.dates.length === 0) {
     try {
-      const res    = await fetch(`${API_URL}?action=getConfig`);
-      const config = await res.json();
-      if (!config.error) {
-        appConfig = config;
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const data = JSON.parse(stored);
-          data.config = config;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        }
+      const config = await apiFetch('getConfig');
+      appConfig = config;
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const data = JSON.parse(stored);
+        data.config = config;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       }
     } catch(e) {
       alert('Could not load dates. Check connection.');
@@ -942,17 +948,13 @@ function renderAttendanceRows() {
 }
 
 async function markAttendance(id, value) {
-  const pin = sessionStorage.getItem(SESSION_PIN);
-
   const singer = allSingers.find(s => String(s.id) === id);
   const prev   = singer ? (singer.attendance[attDateCol] || '') : '';
   if (singer) { singer.attendance[attDateCol] = value; saveLocalData(); }
   renderAttendanceRows();
 
   try {
-    const res  = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateAttendance', pin, id, col: attDateCol, value }) });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    await apiFetch('updateAttendance', { method: 'POST', body: { id, col: attDateCol, value } });
   } catch(err) {
     alert('Failed to save: ' + err.message);
     if (singer) { singer.attendance[attDateCol] = prev; }
@@ -1116,50 +1118,89 @@ function fallbackCopy(text, success) {
   document.body.removeChild(ta);
 }
 
-// ---- PIN ----
-let pinBuffer = '';
+// ---- API ----
+// Every action requires the bearer token; a session-expiry error reopens
+// the login modal automatically. A "not authorized" (403) error is left to
+// propagate normally instead — that means the credentials are fine but the
+// account hasn't been granted access, which re-login can't fix.
+async function apiFetch(action, { method = 'GET', body } = {}) {
+  const url = method === 'GET' ? `${API_URL}?action=${action}` : API_URL;
+  const opts = { method, headers: { 'Authorization': `Bearer ${authToken}` } };
+  if (body) opts.body = JSON.stringify({ action, ...body });
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (data.error) {
+    if (/log in again/i.test(data.error)) {
+      clearAuth();
+      requireLogin(() => loadApp());
+    }
+    throw new Error(data.error);
+  }
+  return data;
+}
 
-function requirePin(callback) {
-  if (sessionStorage.getItem(SESSION_PIN)) { callback(); return; }
+function clearAuth() {
+  authToken = null;
+  authName = null;
+  sessionStorage.removeItem(STORAGE_AUTH_TOKEN);
+  sessionStorage.removeItem(STORAGE_AUTH_NAME);
+}
+
+// ---- Login ----
+function requireLogin(callback) {
   pendingAction = callback;
-  pinBuffer = '';
-  updatePinDots();
-  pinError.classList.add('hidden');
-  pinModal.classList.remove('hidden');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  loginError.classList.add('hidden');
+  loginModal.classList.remove('hidden');
 }
 
-function handlePinKey(key) {
-  if (key === 'cancel') { closePinModal(); return; }
-  if (key === 'delete') { pinBuffer = pinBuffer.slice(0,-1); updatePinDots(); return; }
-  if (pinBuffer.length >= 4) return;
-  pinBuffer += key;
-  updatePinDots();
-  if (pinBuffer.length === 4) verifyPin();
-}
+async function attemptLogin() {
+  const username = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!username || !password) {
+    loginError.textContent = 'Enter your email and password.';
+    loginError.classList.remove('hidden');
+    return;
+  }
 
-function verifyPin() {
-  if (pinBuffer === '0127') {
-    sessionStorage.setItem(SESSION_PIN, pinBuffer);
-    closePinModal();
+  const btn = document.getElementById('login-submit');
+  btn.disabled = true;
+  loginError.classList.add('hidden');
+
+  try {
+    const res = await fetch(`${API_URL}?action=login`, {
+      method: 'POST', body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Confirm access before committing to this login — a valid account
+    // with no grant for this app should still land back on the login
+    // screen with a clear message, not a half-logged-in blank app.
+    const accessRes = await fetch(`${API_URL}?action=checkAccess`, {
+      headers: { 'Authorization': `Bearer ${data.token}` }
+    });
+    const accessData = await accessRes.json();
+    if (accessData.error) throw new Error(accessData.error);
+
+    authToken = data.token;
+    authName = data.displayName || username;
+    sessionStorage.setItem(STORAGE_AUTH_TOKEN, authToken);
+    sessionStorage.setItem(STORAGE_AUTH_NAME, authName);
+
+    closeLoginModal();
     if (pendingAction) { pendingAction(); pendingAction = null; }
-  } else {
-    pinError.classList.remove('hidden');
-    pinBuffer = '';
-    updatePinDots();
-    setTimeout(() => pinError.classList.add('hidden'), 2000);
+  } catch (err) {
+    loginError.textContent = err.message || 'Login failed.';
+    loginError.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
   }
 }
 
-function updatePinDots() {
-  for (let i = 0; i < 4; i++) {
-    document.getElementById(`dot-${i}`).classList.toggle('filled', i < pinBuffer.length);
-  }
-}
-
-function closePinModal() {
-  pinModal.classList.add('hidden');
-  pinBuffer = '';
-  updatePinDots();
+function closeLoginModal() {
+  loginModal.classList.add('hidden');
   pendingAction = null;
 }
 
