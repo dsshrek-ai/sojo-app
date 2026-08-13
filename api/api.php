@@ -126,8 +126,14 @@ function forwardPost(array $payload): array {
     CURLOPT_POSTFIELDS => json_encode($payload),
     CURLOPT_HTTPHEADER => ['Content-Type: text/plain'],
     CURLOPT_RETURNTRANSFER => true,
+    // Apps Script Web Apps answer a POST by running doPost() immediately,
+    // then 302-redirecting to a googleusercontent.com URL that just serves
+    // the already-computed response body -- that follow-up fetch is always
+    // meant to be a GET, not a replayed POST. Forcing POST through it
+    // (CURLOPT_POSTREDIR) hits a page that isn't JSON, which is exactly
+    // what "Unexpected response" was catching. Default curl behavior
+    // (downgrade to GET on redirect) is what Apps Script actually expects.
     CURLOPT_FOLLOWLOCATION => true,
-    CURLOPT_POSTREDIR => 3, // keep POST across the 301/302 redirect Apps Script issues
     CURLOPT_TIMEOUT => 30,
   ]);
   $raw = curl_exec($ch);
