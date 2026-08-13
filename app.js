@@ -1169,8 +1169,8 @@ async function attemptLogin() {
   loginError.classList.add('hidden');
 
   try {
-    const res = await fetch(`${API_URL}?action=login`, {
-      method: 'POST', body: JSON.stringify({ username, password })
+    const res = await fetch(API_URL, {
+      method: 'POST', body: JSON.stringify({ action: 'login', username, password })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
