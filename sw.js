@@ -1,4 +1,4 @@
-const CACHE = 'sojo-v24';
+const CACHE = 'sojo-v25';
 const ASSETS = [
   './',
   './index.html',
@@ -24,10 +24,17 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  if (e.request.url.includes('script.google.com')) {
-    e.respondWith(
-      fetch(e.request).catch(() => new Response('{}', { headers: { 'Content-Type': 'application/json' }}))
-    );
+  // Network first for the read-only roster actions specifically, with an
+  // empty-object fallback when offline. login/checkAccess/writes are left
+  // untouched so a real failure surfaces as a real error instead of being
+  // silently masked -- a fake "success" here would be misread as a valid
+  // (but unauthorized/empty) response, same bug class fixed elsewhere.
+  if (e.request.url.includes('seniorfamily.org/sojo-api/')) {
+    if (e.request.method === 'GET' && /action=(getConfig|getSingers)(&|$)/.test(e.request.url)) {
+      e.respondWith(
+        fetch(e.request).catch(() => new Response('{}', { headers: { 'Content-Type': 'application/json' }}))
+      );
+    }
     return;
   }
   e.respondWith(
