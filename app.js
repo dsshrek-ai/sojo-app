@@ -90,8 +90,13 @@ async function loadApp() {
       renderList();
       showLastUpdated();
       loadingOverlay.classList.add('hidden');
-      // Silently refresh in background — show offline banner only if it fails
-      fetchFromWeb({ silent: true });
+      // Refresh in the background on every load — shown as "Refreshing…" in
+      // place of the timestamp so it's clear this actually happens
+      // automatically, rather than silently and invisibly.
+      lastUpdated.textContent = 'Refreshing…';
+      fetchFromWeb({ silent: true }).finally(() => {
+        if (lastUpdated.textContent === 'Refreshing…') showLastUpdated();
+      });
       return;
     } catch(e) { /* fall through to full fetch */ }
   }
