@@ -803,6 +803,19 @@ html, body {
   color: var(--att-unknown);
 }
 
+/* Confirms the server actually accepted the change -- the active-*
+   highlight above flips instantly on click, before the save even starts,
+   so it can't be that confirmation itself. */
+.att-btn-saved {
+  animation: attSavedPulse 0.6s ease;
+}
+
+@keyframes attSavedPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(21,128,61,0.55); }
+  70%  { box-shadow: 0 0 0 9px rgba(21,128,61,0); }
+  100% { box-shadow: 0 0 0 0 rgba(21,128,61,0); }
+}
+
 /* ============ PIN MODAL ============ */
 .modal {
   position: fixed;

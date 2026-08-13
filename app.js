@@ -955,11 +955,25 @@ async function markAttendance(id, value) {
 
   try {
     await apiFetch('updateAttendance', { method: 'POST', body: { id, col: attDateCol, value } });
+    // The button's highlight already flipped instantly on click, above --
+    // that's just an echo of the tap, not proof the server accepted it.
+    // This pulse is the actual "yes, that saved" confirmation.
+    flashAttendanceSaved(id, value);
   } catch(err) {
     alert('Failed to save: ' + err.message);
     if (singer) { singer.attendance[attDateCol] = prev; }
     renderAttendanceRows();
   }
+}
+
+function flashAttendanceSaved(id, value) {
+  const btn = document.querySelector(`.att-btn[data-id="${CSS.escape(id)}"][data-val="${CSS.escape(value)}"]`);
+  if (!btn) return;
+  btn.classList.remove('att-btn-saved');
+  // Force a reflow so re-adding the class restarts the animation even if
+  // the same button was just flashed a moment ago.
+  void btn.offsetWidth;
+  btn.classList.add('att-btn-saved');
 }
 
 // ---- Share ----

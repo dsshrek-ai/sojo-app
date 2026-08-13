@@ -1,4 +1,4 @@
-const CACHE = 'sojo-v26';
+const CACHE = 'sojo-v27';
 const ASSETS = [
   './',
   './index.html',
