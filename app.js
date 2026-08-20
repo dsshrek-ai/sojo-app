@@ -920,7 +920,14 @@ async function openAttendance() {
   dates.forEach(d => {
     html += `<option value="${d.col}"${d.col === attDateCol ? ' selected' : ''}>${d.label}</option>`;
   });
-  html += `</select></div><div id="att-singer-rows"></div>`;
+  html += `</select></div>
+    <div class="att-legend">
+      <div class="att-legend-item"><div class="legend-dot legend-X"></div> X = Present</div>
+      <div class="att-legend-item"><div class="legend-dot legend-O"></div> O = Absent</div>
+      <div class="att-legend-item"><div class="legend-dot legend-E"></div> E = Exempt</div>
+      <div class="att-legend-item"><div class="legend-dot legend-blank"></div> – = Unknown</div>
+    </div>
+    <div id="att-singer-rows"></div>`;
 
   attContent.innerHTML = html;
   document.getElementById('att-date-select').addEventListener('change', e => {
