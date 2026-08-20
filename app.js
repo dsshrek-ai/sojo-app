@@ -105,9 +105,27 @@ async function loadApp() {
 }
 
 // ---- Service Worker ----
+// Two update paths, both needed:
+//   1. A newer version was already installed on a PREVIOUS visit but never
+//      applied (the banner below was missed/dismissed) — reg.waiting is
+//      truthy the moment registration resolves. Since this is a fresh page
+//      load (nothing to lose), apply it immediately and reload once, rather
+//      than leaving the device stuck on old code indefinitely. This is what
+//      was actually causing "I have to manually refresh" even after
+//      auto-refresh-on-open shipped: the auto-refresh code itself was stuck
+//      behind an update banner nobody had a reason to click.
+//   2. A newer version is found WHILE the app is already open this session
+//      (reg.update() below, or the browser's own periodic check) — still
+//      just a soft banner, not a forced reload, so an in-progress edit
+//      isn't yanked out from under the user.
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('sw.js').then(reg => {
+    if (reg.waiting) {
+      applyWaitingUpdate(reg.waiting);
+      return;
+    }
+
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
       nw.addEventListener('statechange', () => {
@@ -115,8 +133,7 @@ function registerSW() {
           const banner = document.getElementById('update-banner');
           if (banner) banner.classList.remove('hidden');
           document.getElementById('btn-update').addEventListener('click', () => {
-            nw.postMessage('skipWaiting');
-            window.location.reload();
+            applyWaitingUpdate(nw);
           });
           document.getElementById('btn-dismiss-update').addEventListener('click', () => {
             banner.classList.add('hidden');
@@ -124,7 +141,22 @@ function registerSW() {
         }
       });
     });
+
+    // Force an immediate check for a newer sw.js right now, instead of
+    // waiting on the browser's own (much less frequent) background check —
+    // this is what makes case 2 actually fire promptly on open too.
+    reg.update().catch(() => {});
   }).catch(() => {});
+}
+
+let reloadedForUpdate = false;
+function applyWaitingUpdate(worker) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadedForUpdate) return;
+    reloadedForUpdate = true;
+    window.location.reload();
+  });
+  worker.postMessage('skipWaiting');
 }
 
 // ---- Fetch ----
