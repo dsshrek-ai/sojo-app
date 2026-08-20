@@ -1,4 +1,4 @@
-const CACHE = 'sojo-v29';
+const CACHE = 'sojo-v30';
 const ASSETS = [
   './',
   './index.html',
@@ -24,17 +24,19 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network first for the read-only roster actions specifically, with an
-  // empty-object fallback when offline. login/checkAccess/writes are left
-  // untouched so a real failure surfaces as a real error instead of being
-  // silently masked -- a fake "success" here would be misread as a valid
-  // (but unauthorized/empty) response, same bug class fixed elsewhere.
+  // Every sojo-api call (read or write) goes straight to the network,
+  // completely unintercepted -- api.php always needs a live round trip
+  // (auth, live roster data), so there's nothing useful to serve from
+  // this cache for it either way. A previous version faked an empty `{}`
+  // response here for getConfig/getSingers specifically on a failed
+  // fetch, meant as an offline fallback -- but that made a real failure
+  // (e.g. a transient network hiccup during the automatic background
+  // refresh on open) look like a *successful* empty response to the
+  // page, which corrupted the cached roster (app.js's own
+  // fetchFromWeb() already handles a genuine rejection correctly, with
+  // an offline banner and no cache corruption -- this was actively
+  // working against that, not complementing it).
   if (e.request.url.includes('seniorfamily.org/sojo-api/')) {
-    if (e.request.method === 'GET' && /action=(getConfig|getSingers)(&|$)/.test(e.request.url)) {
-      e.respondWith(
-        fetch(e.request).catch(() => new Response('{}', { headers: { 'Content-Type': 'application/json' }}))
-      );
-    }
     return;
   }
   e.respondWith(

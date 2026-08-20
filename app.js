@@ -74,7 +74,16 @@ async function init() {
     sessionStorage.setItem(STORAGE_AUTH_NAME, authName || '');
     await loadApp();
   } catch (e) {
-    requireLogin(() => loadApp());
+    // A bad/expired/unauthorized token would otherwise just sit in
+    // sessionStorage and fail the same way on every future visit — clear it
+    // so the next attempt (SSO or manual) starts clean instead of retrying
+    // the same rejected token forever.
+    clearAuth();
+    // Surface *why* — this was silent before, which made "SSO isn't
+    // carrying over" impossible to diagnose: same blank login form whether
+    // the token never arrived, was rejected, or checkAccess errored for an
+    // unrelated reason (e.g. no app_access grant for sojo-membership).
+    requireLogin(() => loadApp(), ssoToken ? `Signed in via My Apps Hub, but couldn't get in: ${e.message}` : undefined);
   }
 }
 
@@ -1198,11 +1207,16 @@ function clearAuth() {
 }
 
 // ---- Login ----
-function requireLogin(callback) {
+function requireLogin(callback, message) {
   pendingAction = callback;
   document.getElementById('login-email').value = '';
   document.getElementById('login-password').value = '';
-  loginError.classList.add('hidden');
+  if (message) {
+    loginError.textContent = message;
+    loginError.classList.remove('hidden');
+  } else {
+    loginError.classList.add('hidden');
+  }
   loginModal.classList.remove('hidden');
 }
 
