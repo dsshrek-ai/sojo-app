@@ -4,6 +4,9 @@
    ============================================ */
 
 const API_URL         = 'https://seniorfamily.org/sojo-api/api.php';
+// Concert tickets live with the choir member app's API (same MyDataWorld
+// login), which lets SOJO Membership users manage any singer's request.
+const CHOIR_API_URL   = 'https://seniorfamily.org/choir-api/api.php';
 const STORAGE_KEY     = 'sojoAllData';
 const STORAGE_BACKUP  = 'sojoAllDataBackup';
 const STORAGE_UPDATED = 'sojoLastUpdated';
@@ -707,6 +710,10 @@ function openProfile(singer) {
   html += infoRow('Notes 2', escHtml(singer.notes2));
   html += `</div>`;
 
+  // Concert tickets (filled in by loadProfileTickets below)
+  html += `<div class="info-section"><div class="info-section-title">Concert Tickets</div>
+    <div id="profile-tickets" class="tk-body">Loading…</div></div>`;
+
   // Attendance
   if (dates.length > 0) {
     const present = Object.values(singer.attendance).filter(v => v === 'X').length;
@@ -735,7 +742,128 @@ function openProfile(singer) {
   profileContent.scrollTop = 0;
   slideOut(screenHome);
   slideIn(screenProfile);
+  loadProfileTickets(singer);
 }
+
+// ---- Concert tickets (on the singer's profile) ----
+// Same rules as the singer's own Tickets page in the choir member app: up
+// to the per-singer limit across all showings, seats permitting, until each
+// showing's claim deadline -- all enforced by choir-api.
+async function choirApi(action, { method = 'GET', body, query } = {}) {
+  const url = method === 'GET'
+    ? `${CHOIR_API_URL}?${new URLSearchParams({ action, ...(query || {}) })}`
+    : CHOIR_API_URL;
+  const opts = { method, headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'text/plain' } };
+  if (body) opts.body = JSON.stringify({ action, ...body });
+  const res = await fetch(url, opts);
+  if (res.status === 401 || res.status === 403) throw new Error('not-authorized');
+  return res.json();
+}
+
+const ticketWord = n => `${n} ticket${n === 1 ? '' : 's'}`;
+let profileTickets = null; // { singer, data } for the profile on screen
+
+async function loadProfileTickets(singer) {
+  const box = document.getElementById('profile-tickets');
+  if (!box) return;
+  profileTickets = null;
+  const email = (singer.email || '').trim();
+  if (!email) {
+    box.innerHTML = '<div class="tk-note">No email on the roster, so tickets can\'t be requested here. Add one with Edit.</div>';
+    return;
+  }
+  try {
+    const data = await choirApi('ticketsForSinger', { query: { email } });
+    if (currentSinger !== singer) return; // moved on to another profile
+    profileTickets = { singer, data };
+    renderProfileTickets();
+  } catch (e) {
+    if (currentSinger !== singer) return;
+    box.innerHTML = `<div class="tk-note">${e.message === 'not-authorized'
+      ? 'Your login isn\'t set up to manage concert tickets.'
+      : 'Couldn\'t load tickets right now.'}</div>`;
+  }
+}
+
+function formatShowDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+}
+
+function renderProfileTickets(message) {
+  const box = document.getElementById('profile-tickets');
+  if (!box || !profileTickets) return;
+  const { singer, data } = profileTickets;
+  const first = singer.firstname || 'This singer';
+  const limit = data.limit;
+  const total = data.shows.reduce((a, s) => a + s.Mine, 0);
+  let html = message ? `<div class="tk-msg">${escHtml(message)}</div>` : '';
+  html += `<div class="tk-note">${escHtml(first)} has <strong>${ticketWord(total)}</strong> of ${limit} allowed (both showings combined).</div>`;
+  data.shows.forEach(s => {
+    const room = limit - total + s.Mine;
+    const buttons = [];
+    if (s.Open) {
+      for (let n = 1; n <= Math.min(room, limit); n++) {
+        if (n === s.Mine) continue;
+        const more = n > s.Mine;
+        if (more && n - s.Mine > s.Available) continue;
+        buttons.push(`<button class="tk-btn" data-tk-show="${s.Id}" data-tk-qty="${n}">${s.Mine
+          ? (more ? `Change to ${n}` : `Return ${s.Mine - n}, keep ${n}`)
+          : `Request ${ticketWord(n)}`}</button>`);
+      }
+      if (s.Mine) buttons.push(`<button class="tk-btn tk-btn-return" data-tk-show="${s.Id}" data-tk-qty="0">Return ${s.Mine === 1 ? 'it' : `all ${s.Mine}`}</button>`);
+    }
+    const when = [formatShowDate(s.Date), s.Time].filter(Boolean).join(' · ');
+    html += `<div class="tk-show">
+      <div class="tk-show-head"><span class="tk-show-title">${escHtml(s.Time || s.Title)}</span>
+        <span class="tk-mine">${s.Mine ? ticketWord(s.Mine) : 'None'}</span></div>
+      <div class="tk-sub">${escHtml(when)} · ${s.Available} of ${s.Capacity} left</div>
+      ${!s.Open ? '<div class="tk-sub">Requests are closed.</div>'
+        : buttons.length ? `<div class="tk-actions">${buttons.join('')}</div>`
+        : `<div class="tk-sub">${s.Available === 0 && !s.Mine ? 'All claimed.' : `Already at the ${limit}-ticket limit.`}</div>`}
+    </div>`;
+  });
+  box.innerHTML = html;
+}
+
+const TICKET_REASONS = {
+  closed: 'Requests for that showing have closed.',
+  'sold-out': 'Not enough tickets left for that showing.',
+  limit: 'That would put them over their ticket limit.',
+  'picked-up': 'Those tickets have already been picked up at the desk.',
+  busy: 'The ticket list is busy. Please try again.',
+};
+
+async function setProfileTickets(showId, qty) {
+  if (!profileTickets) return;
+  const { singer, data } = profileTickets;
+  const show = data.shows.find(s => s.Id === showId);
+  const name = `${singer.firstname || ''} ${singer.lastname || ''}`.trim();
+  if (qty < show.Mine && !confirm(qty === 0
+    ? `Return ${name}'s ${ticketWord(show.Mine)} for the ${show.Time} showing?`
+    : `Return ${show.Mine - qty} of ${name}'s tickets and keep ${qty}?`)) return;
+  document.querySelectorAll('#profile-tickets .tk-btn').forEach(b => { b.disabled = true; });
+  let message;
+  try {
+    const result = await choirApi('setTicketsForSinger', {
+      method: 'POST', body: { email: singer.email.trim(), name, showId, quantity: qty },
+    });
+    message = result.ok
+      ? (qty === 0 ? `Returned. ${name} has none for the ${show.Time} showing.` : `${name} now has ${ticketWord(qty)} for the ${show.Time} showing.`)
+      : (TICKET_REASONS[result.reason] || 'Something went wrong. Please try again.');
+  } catch (e) {
+    message = e.message === 'not-authorized' ? 'Your login isn\'t set up to manage concert tickets.' : 'Something went wrong. Please try again.';
+  }
+  try {
+    profileTickets.data = await choirApi('ticketsForSinger', { query: { email: singer.email.trim() } });
+  } catch (e) { /* keep the old numbers */ }
+  if (currentSinger === singer) renderProfileTickets(message);
+}
+
+profileContent.addEventListener('click', ev => {
+  const btn = ev.target.closest('[data-tk-show]');
+  if (btn) setProfileTickets(Number(btn.dataset.tkShow), Number(btn.dataset.tkQty));
+});
 
 function infoRow(label, value) {
   const isEmpty = !value || value.toString().trim() === '';

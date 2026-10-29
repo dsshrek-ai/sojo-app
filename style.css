@@ -1468,3 +1468,17 @@ html, body {
   cursor: pointer;
 }
 .note-modal-save:disabled { opacity: 0.6; }
+
+/* ============ CONCERT TICKETS (profile) ============ */
+.tk-body { font-size: 14px; color: var(--text-dark); }
+.tk-note { font-size: 13px; color: var(--text-light); padding: 4px 0 8px; }
+.tk-msg { background: var(--gold-pale); border-left: 3px solid var(--gold); padding: 8px 10px; margin-bottom: 8px; border-radius: var(--radius-sm); font-size: 13px; }
+.tk-show { padding: 8px 0 10px; border-bottom: 1px solid var(--gray-light); }
+.tk-show-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.tk-show-title { font-weight: 700; color: var(--navy); }
+.tk-mine { font-weight: 700; }
+.tk-sub { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+.tk-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tk-btn { border: none; border-radius: var(--radius-md); background: var(--navy); color: var(--white); font-size: 13px; font-weight: 600; padding: 9px 12px; cursor: pointer; }
+.tk-btn-return { background: var(--gray-light); color: var(--text-dark); }
+.tk-btn:disabled { opacity: 0.5; }
