@@ -1,4 +1,4 @@
-const CACHE = 'sojo-v30';
+const CACHE = 'sojo-v31';
 const ASSETS = [
   './',
   './index.html',
@@ -36,7 +36,7 @@ self.addEventListener('fetch', e => {
   // fetchFromWeb() already handles a genuine rejection correctly, with
   // an offline banner and no cache corruption -- this was actively
   // working against that, not complementing it).
-  if (e.request.url.includes('seniorfamily.org/sojo-api/')) {
+  if (e.request.url.includes('seniorfamily.org/sojo-api/') || e.request.url.includes('seniorfamily.org/choir-api/')) {
     return;
   }
   e.respondWith(
